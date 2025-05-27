@@ -41,6 +41,9 @@ show_help() {
   echo -e "${BOLD}General Options:${NC}"
   echo -e "  -v --version\tDisplay the current version of script."
   echo -e "  -h --help\tShow this help message and exit."
+  echo -e "  --install\tInstall this script to '/usr/local/bin' with executable permission."
+  echo -e "\t\tAlso removes macOS quarantine attributes using xattr."
+  echo -e "\t\tRecommended usage: ${BOLD}sudo ./ai.sh --install${NC}"
   echo
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"
   echo -e "  -l\t\tInstall the latest APK file from the current directory."
@@ -82,6 +85,7 @@ process_options() {
       - ) case "${OPTARG}" in
             version ) show_version; exit 0 ;;
             help ) show_help; exit 0 ;;
+            install ) install_script; exit 0 ;;
             * ) echo "Invalid option: --${OPTARG}" 1>&2; exit 1 ;;
           esac
         ;;
@@ -509,6 +513,29 @@ start_adb_install() {
   adb ${device_opt} install ${install_opt} "${apk_file}" 2>&1
 }
 
+# 스크립트를 /usr/local/bin 에 설치하고 실행 권한 및 격리 해제를 수행합니다.
+install_script() {
+  local src_path
+  src_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  local filename
+  filename="$(basename "$src_path")"
+  filename="${filename%.sh}"  # .sh 확장자 제거
+  local dest_path="/usr/local/bin/$filename"
+
+  echo -e "${BARROW} Installing '${YELLOW}${filename}${NC}' to ${CYAN}/usr/local/bin${NC}..."
+
+  if [ ! -w "/usr/local/bin" ]; then
+    echo -e "${ERROR} Permission denied. Try running with 'sudo'."
+    return 1
+  fi
+
+  cp "$src_path" "$dest_path"
+  chmod +x "$dest_path"
+  xattr -d com.apple.quarantine "$dest_path" 2>/dev/null
+
+  echo -e "${GARROW} Installed successfully at '${CYAN}${dest_path}${NC}'"
+}
+
 main() {
    # 설치 옵션 처리
   initialize_variables
@@ -523,5 +550,4 @@ main() {
   execute_installation
 }
 
-# 메인 로직
 main "$@"

@@ -133,6 +133,18 @@ usage() {
     echo -e "      Extract SHA-256 signature hash of the app using apksigner."
     echo -e "      Requires APK pull and ANDROID_HOME to be set."
     echo
+    echo -e "${CYAN}${BOLD}Options:${NC}"
+    echo -e "  ${BOLD}--install${NC}"
+    echo -e "      Install this script to /usr/local/bin with executable permission."
+    echo -e "      Also removes macOS quarantine attributes using xattr."
+    echo -e "      Recommended usage: ${BOLD}sudo ./ak.sh --install${NC}"
+    echo
+    echo -e "  ${BOLD}--version${NC}, ${BOLD}-v${NC}"
+    echo -e "      Display the script version and release date."
+    echo
+    echo -e "  ${BOLD}--help${NC}, ${BOLD}-h${NC}"
+    echo -e "      Show this help message and usage guide."
+    echo
 }
 # uninstall 커맨드 사용법 출력 함수
 usage_uninstall() {
@@ -622,6 +634,10 @@ process_options() {
         launch)
             launch_package "$@"
             ;;
+        --install)
+            install_script
+            exit 0
+            ;;
         --version|-v)
             show_version
             exit 0
@@ -637,6 +653,30 @@ process_options() {
             exit 1
             ;;
     esac
+}
+
+
+# 스크립트를 /usr/local/bin 에 설치하고 실행 권한 및 격리 해제를 수행합니다.
+install_script() {
+  local src_path
+  src_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  local filename
+  filename="$(basename "$src_path")"
+  filename="${filename%.sh}"  # .sh 확장자 제거
+  local dest_path="/usr/local/bin/$filename"
+
+  echo -e "${BARROW} Installing '${YELLOW}${filename}${NC}' to ${CYAN}/usr/local/bin${NC}..."
+
+  if [ ! -w "/usr/local/bin" ]; then
+    echo -e "${ERROR} Permission denied. Try running with 'sudo'."
+    return 1
+  fi
+
+  cp "$src_path" "$dest_path"
+  chmod +x "$dest_path"
+  xattr -d com.apple.quarantine "$dest_path" 2>/dev/null
+
+  echo -e "${GARROW} Installed successfully at '${CYAN}${dest_path}${NC}'"
 }
 
 main() {

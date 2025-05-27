@@ -7,23 +7,16 @@ ADB 기반으로 Android 앱을 설치하거나 정보를 관리할 수 있는 �
 
 ## 설치 방법
 
-다음 명령으로 시스템 PATH에 등록해두면 어디서든 `ai`, `ak` 명령을 사용할 수 있습니다.
-
-macOS에서 다운로드한 스크립트가 격리되어 실행되지 않을 경우, 아래 명령어로 격리를 해제할 수 있습니다:
+`ai.sh`와 `ak.sh` 스크립트는 `--install` 옵션을 지원합니다. 이 옵션을 사용하면 스크립트를 자동으로 `/usr/local/bin`에 복사하고 실행 권한을 부여하며, macOS의 격리 해제도 함께 처리합니다.
 
 ```bash
-xattr -d com.apple.quarantine ai.sh
-xattr -d com.apple.quarantine ak.sh
+sudo ./ai.sh --install
+sudo ./ak.sh --install
 ```
 
-```bash
-# 스크립트 권한 부여 및 시스템 명령으로 등록
-chmod +x ai.sh ak.sh
-sudo cp ai.sh /usr/local/bin/ai
-sudo cp ak.sh /usr/local/bin/ak
-```
+설치가 완료되면 터미널에서 `ai` 또는 `ak` 명령어를 바로 사용할 수 있습니다.
 
-> `.sh` 확장자는 제거되어 `ai`, `ak` 명령어처럼 간단하게 사용할 수 있습니다.
+> 만약 실행 권한 문제가 있거나 macOS에서 다운로드한 스크립트가 격리되어 실행되지 않을 경우, `--install` 옵션을 이용하면 자동으로 해결됩니다.
 
 ---
 
