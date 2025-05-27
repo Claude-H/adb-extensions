@@ -350,9 +350,6 @@ uninstall_package() {
 
     echo
     validate_package_or_exit "$package_name"
-
-    echo -e "${YELLOW}→ Attempting to uninstall:${NC} $package_name"
-    echo
     
     uninstall_output=$(adb -s "$G_SELECTED_DEVICE" uninstall "$package_name")
     
