@@ -92,7 +92,7 @@ contains() {
 
 show_version() {
   echo "$0 ${VERSION} Released on ${RELEASE_DATE}"
-  echo "Designed and Developed by C.J. Hwang"
+  echo "Designed and Developed by Claude Hwang"
 }
 
 # 사용법 출력 함수
