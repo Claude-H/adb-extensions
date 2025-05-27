@@ -9,6 +9,13 @@ ADB 기반으로 Android 앱을 설치하거나 정보를 관리할 수 있는 �
 
 다음 명령으로 시스템 PATH에 등록해두면 어디서든 `ai`, `ak` 명령을 사용할 수 있습니다.
 
+macOS에서 다운로드한 스크립트가 격리되어 실행되지 않을 경우, 아래 명령어로 격리를 해제할 수 있습니다:
+
+```bash
+xattr -d com.apple.quarantine ai.sh
+xattr -d com.apple.quarantine ak.sh
+```
+
 ```bash
 # 스크립트 권한 부여 및 시스템 명령으로 등록
 chmod +x ai.sh ak.sh
