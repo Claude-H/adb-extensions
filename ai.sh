@@ -18,7 +18,7 @@ GARROW="${GREEN}==>${NC}"
 ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
 
 show_version() {
-  echo "ais ${VERSION} Released on ${RELEASE_DATE}"
+  echo "$0 ${VERSION} Released on ${RELEASE_DATE}"
   echo "Designed and Developed by C.J. Hwang"
 }
 
@@ -31,7 +31,7 @@ show_help() {
   echo -e "  Current Version: $VERSION"
   echo
   echo -e "${BOLD}General Options:${NC}"
-  echo -e "  -v --version\tDisplay the current version of ais script."
+  echo -e "  -v --version\tDisplay the current version of script."
   echo -e "  -h --help\tShow this help message and exit."
   echo
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"

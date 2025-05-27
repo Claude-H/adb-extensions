@@ -8,7 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.0"
+VERSION="1.6.1"
+RELEASE_DATE="2025-05-27"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -87,6 +88,11 @@ contains() {
         fi
     done
     return 1
+}
+
+show_version() {
+  echo "$0 ${VERSION} Released on ${RELEASE_DATE}"
+  echo "Designed and Developed by C.J. Hwang"
 }
 
 # 사용법 출력 함수
@@ -615,6 +621,10 @@ process_options() {
             ;;
         launch)
             launch_package "$@"
+            ;;
+        --version|-v)
+            show_version
+            exit 0
             ;;
         --help|-h)
             usage
