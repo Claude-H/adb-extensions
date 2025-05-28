@@ -10,6 +10,7 @@ ADB 기반으로 Android 앱을 설치하거나 정보를 관리할 수 있는 �
 `ai.sh`와 `ak.sh` 스크립트는 `--install` 옵션을 지원합니다. 이 옵션을 사용하면 스크립트를 자동으로 `/usr/local/bin`에 복사하고 실행 권한을 부여하며, macOS의 격리 해제도 함께 처리합니다.
 
 ```bash
+git clone https://github.com/Claude-H/adb-extensions.git
 sudo ./ai.sh --install
 sudo ./ak.sh --install
 ```
