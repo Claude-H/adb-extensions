@@ -99,18 +99,18 @@ ak <명령어> [패키지명] [추가 인자...]
 
 #### 명령어 목록
 
-| 명령         | 설명                                                                 |
-|--------------|----------------------------------------------------------------------|
-| `pull`       | APK 추출: `ak pull [패키지명] [파일명]`                              |
-| `info`       | 앱 상세 정보 (버전, SDK, 설치 시간 등)                               |
-| `permissions`| 권한 목록 출력                                                        |
-| `uninstall`  | 앱 제거                                                               |
-| `kill`       | 강제 종료: `ak kill <패키지1> [패키지2 ...]`                         |
-| `devices`    | 연결된 디바이스 목록 (모델, Android 버전)                            |
-| `launch`     | 앱 실행 (런처 액티비티 기준)                                          |
-| `signature`  | SHA-256 서명 해시 추출 (APK 필요, `ANDROID_HOME` 환경 변수 필요)     |
+| 명령어        | 사용 예시 | 설명 |
+|---------------|-----------|------|
+| `pull`        | `ak pull [packageName] [outputFile]` | 지정한 앱의 APK 파일을 로컬로 저장합니다. 출력 파일명을 생략하면 `[packageName].apk`로 저장됩니다. |
+| `info`        | `ak info [packageName]` | 앱의 버전, 설치 시점, 데이터 경로 등 핵심 정보를 조회합니다. |
+| `permissions` | `ak permissions [packageName]` | 앱이 요청한 권한 목록을 출력합니다. |
+| `uninstall`   | `ak uninstall [packageName]` | 앱을 디바이스에서 제거합니다. |
+| `kill`        | `ak kill <packageName1> [packageName2 ...]` | 하나 이상의 앱 프로세스를 강제 종료합니다. 첫 번째 패키지명은 필수이며, 이후는 선택적으로 추가할 수 있습니다. |
+| `devices`     | `ak devices` | 연결된 디바이스 목록과 상태 정보를 출력합니다. |
+| `launch`      | `ak launch [packageName]` | 앱의 런처 액티비티를 실행합니다. |
+| `signature`   | `ak signature [packageName]` | 앱의 SHA-256 서명 해시를 출력합니다. `ANDROID_HOME` 환경 변수가 설정되어 있어야 합니다. |
 
-> `패키지명`을 생략하면 현재 포그라운드 앱 기준으로 동작합니다.
+> `[packageName]`을 생략하면 현재 포그라운드 앱 기준으로 동작합니다.
 
 ---
 
