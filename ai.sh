@@ -443,7 +443,7 @@ resolve_downgrade() {
   if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
     # 패키지 이름 추출
     local package_name
-    package_name=$(aapt dump badging ${apk_file} | grep package:\ name | awk -F"'" '{print $2}')=$(aapt dump badging ${apk_file} | grep package:\ name | awk -F"'" '{print $2}')
+    package_name=$(aapt dump badging ${apk_file} | grep package:\ name | awk -F"'" '{print $2}')
 
     echo
     echo -e "${BARROW} Uninstalling package: ${BOLD}${package_name}${NC}"
