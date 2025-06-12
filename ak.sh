@@ -491,7 +491,7 @@ launch_package() {
 
 # 연결된 디바이스를 모델명, Android 버전, 상태와 함께 출력
 find_and_list_devices() {
-    local line device_id status info status_color
+    local line device_id status info colored_status
     G_DEVICES=()
     while IFS= read -r line; do
         [[ "$line" =~ ^List ]] && continue
@@ -510,12 +510,12 @@ find_and_list_devices() {
         status=$(echo "$line" | awk '{print $2}')
         info=$(pretty_device "$device_id")
         case "$status" in
-            device) status_color="${GREEN}${BOLD}${status}${NC}" ;;
-            unauthorized) status_color="${RED}${BOLD}${status}${NC}" ;;
-            offline) status_color="${PURPLE}${BOLD}${status}${NC}" ;;
-            *) status_color="${YELLOW}${BOLD}${status}${NC}" ;;
+            device) colored_status="${GREEN}${BOLD}${status}${NC}" ;;
+            unauthorized) colored_status="${RED}${BOLD}${status}${NC}" ;;
+            offline) colored_status="${PURPLE}${BOLD}${status}${NC}" ;;
+            *) colored_status="${YELLOW}${BOLD}${status}${NC}" ;;
         esac
-        echo -e "  ${YELLOW}${info}${NC} - ${status_color}"
+        echo -e "  ${YELLOW}${info}${NC} - ${colored_status}"
     done
     echo ""
 }
@@ -569,6 +569,14 @@ present_device_selection() {
 pretty_device() {
     local device_id="$1"
     local props brand model version api
+    local device_status
+
+    # 디바이스 상태 확인
+    device_status=$(adb devices | grep "$device_id" | awk '{print $2}')
+    if [[ "$device_status" == "unauthorized" ]] || [[ "$device_status" == "offline" ]]; then
+        echo "($device_id)"
+        return
+    fi
 
     props=$(adb -s "$device_id" shell getprop)
 
