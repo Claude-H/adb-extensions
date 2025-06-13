@@ -32,6 +32,9 @@ sudo ./ak.sh --install
 - APK 파일 필터링 기능 (`-s` 옵션)
   - 단일 패턴: `-s debug`
   - 다중 패턴: `-s "myapp release"`
+- APK 파일 직접 지정 설치
+  - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
+  - 예: `ai app1.apk app2.apk`
 
 ### `ak` - APK 관리 도구 (APK Toolkit)
 
@@ -64,6 +67,7 @@ ai [옵션] [apk파일...]
 | `-l` | 현재 디렉토리에서 가장 최신 APK 설치         |
 | `-a` | 현재 디렉토리의 모든 APK 설치                |
 | `-s [pattern]` | 설치할 APK를 사용자에게 선택하도록 인터랙티브 제공<br>- 단일 패턴: `-s debug`<br>- 다중 패턴: `-s "myapp release"` |
+| (없음) | 지정한 APK 파일들을 직접 설치<br>예: `ai app1.apk app2.apk` |
 
 #### 디바이스 옵션
 
@@ -121,6 +125,9 @@ ak <명령어> [패키지명] [추가 인자...]
 ## 사용 예시
 
 ```bash
+# 지정한 APK 파일들을 직접 설치
+ai app1.apk app2.apk
+
 # 최신 APK를 모든 기기에 설치
 ai -l -m
 
