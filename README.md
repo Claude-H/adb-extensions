@@ -161,3 +161,6 @@ This project is licensed under the MIT License.
 © 2025 Cladue Hwang
 
 For more details, see the [LICENSE.md](./LICENSE.md) file.
+
+## 변경 이력
+자세한 변경 이력은 [CHANGELOG.md](CHANGELOG.md)를 참조하세요.
