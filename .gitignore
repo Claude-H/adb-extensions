@@ -1,0 +1,80 @@
+# IDE - VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# IDE - Cursor
+.cursor/
+.cursor-cache/
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+*.iws
+out/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+*.temp
+
+# Logs
+*.log
+logs/
+log/
+
+# Build output
+dist/
+build/
+out/
+target/
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production 
