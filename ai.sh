@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.6.0"
-RELEASE_DATE="2025-05-27"
+VERSION="2.6.2"
+RELEASE_DATE="2025-06-13"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -48,7 +48,11 @@ show_help() {
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"
   echo -e "  -l\t\tInstall the latest APK file from the current directory."
   echo -e "  -a\t\tInstall all APK files from the current directory."
-  echo -e "  -s\t\tSelect APK files from the current directory interactively."
+  echo -e "  -s [pattern]\tSelect APK files from the current directory interactively."
+  echo -e "\t\tOptional pattern to filter APK files."
+  echo -e "\t\tExamples:"
+  echo -e "\t\t  -s debug\t\tFind APKs containing 'debug'"
+  echo -e "\t\t  -s \"myapp release\"\tFind APKs containing both 'myapp' and 'release'"
   echo
   echo -e "${BOLD}Device Options:${NC}"
   echo -e "  -m\t\tInstall APK files on all connected devices."
@@ -69,6 +73,7 @@ initialize_variables() {
   opt_a_used=0
   opt_m_used=0
   opt_s_used=0
+  filter_pattern=""  # 필터 패턴을 저장할 변수 추가
 }
 
 process_options() {
@@ -94,6 +99,12 @@ process_options() {
   done
   # 처리된 옵션을 제거한다.
   shift $((OPTIND -1))
+
+  # -s 옵션 사용 시 첫 번째 인자를 필터 패턴으로 사용
+  if [ $opt_s_used -eq 1 ] && [ $# -gt 0 ]; then
+    filter_pattern="$1"
+    shift
+  fi
 }
 
 # 옵션 조합을 처리하는 함수
@@ -203,6 +214,31 @@ select_apk_interactively() {
     exit 1
   fi
 
+  # 필터 패턴이 있는 경우 필터링
+  if [ -n "$filter_pattern" ]; then
+    filtered_apks=()
+    for apk in "${apk_list[@]}"; do
+      # 패턴을 공백으로 분리하여 각각의 패턴을 검색
+      all_patterns_match=true
+      IFS=' ' read -ra patterns <<< "$filter_pattern"
+      for pattern in "${patterns[@]}"; do
+        if ! echo "$apk" | grep -i -q "$pattern"; then
+          all_patterns_match=false
+          break
+        fi
+      done
+      if [ "$all_patterns_match" = true ]; then
+        filtered_apks+=("$apk")
+      fi
+    done
+    apk_list=("${filtered_apks[@]}")
+    
+    if [ ${#apk_list[@]} -eq 0 ]; then
+      echo -e "${ERROR} No APK files found matching all patterns: '$filter_pattern'"
+      exit 1
+    fi
+  fi
+
   # 현재 폴더에 APK 파일이 1개인 경우 자동으로 선택
   if [ ${#apk_list[@]} -eq 1 ]; then
     selected_apks=("${apk_list[0]}")
@@ -218,7 +254,7 @@ select_apk_interactively() {
   done
 
   echo
-  read -p "Select APK files to install (comma-separated numbers): " apk_selection
+  read -p "Select APK files to install (enter numbers separated by comma [,]): " apk_selection
 
   # 선택된 APK 파일을 배열로 저장
   selected_apks=()
