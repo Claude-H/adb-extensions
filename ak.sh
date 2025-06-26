@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.3"
-RELEASE_DATE="2025-06-26"
+VERSION="1.6.4"
+RELEASE_DATE="2025-06-27"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -267,7 +267,7 @@ pull_apk() {
 # appinfo 커맨드 함수
 get_app_info() {
     local package_name=$1
-    local version_name version_code target_sdk first_install_time last_update_time installer data_dir
+    local version_name version_code target_sdk min_sdk debuggable installer
 
     if [ -z "$package_name" ]; then
         package_name=$(detect_foreground_package)
@@ -282,13 +282,13 @@ get_app_info() {
     local dumpsys_output
     dumpsys_output=$(adb -s "$G_SELECTED_DEVICE" shell dumpsys package "$package_name")
 
-    version_name=$(echo "$dumpsys_output" | grep versionName | head -n 1 | cut -d'=' -f2)
-    version_code=$(echo "$dumpsys_output" | grep versionCode | head -n 1 | awk '{print $1}' | cut -d'=' -f2)
+    version_name=$(echo "$dumpsys_output" | grep versionName | head -n 1 | cut -d'=' -f2 | xargs)
+    version_code=$(echo "$dumpsys_output" | grep versionCode | head -n 1 | awk '{print $1}' | cut -d'=' -f2 | xargs)
+    min_sdk=$(echo "$dumpsys_output" | grep "minSdk=" | head -n 1 | sed -n 's/.*minSdk=\([0-9]*\).*/\1/p')
     target_sdk=$(echo "$dumpsys_output" | grep "targetSdk=" | head -n 1 | sed -n 's/.*targetSdk=\([0-9]*\).*/\1/p')
-    first_install_time=$(echo "$dumpsys_output" | grep firstInstallTime | cut -d'=' -f2)
-    last_update_time=$(echo "$dumpsys_output" | grep lastUpdateTime | cut -d'=' -f2)
-    installer=$(echo "$dumpsys_output" | grep installerPackageName | cut -d'=' -f2)
-    data_dir=$(echo "$dumpsys_output" | grep dataDir | head -n 1 | cut -d'=' -f2)
+    debuggable=$(echo "$dumpsys_output" | grep -i "flags=\[" | grep -q "DEBUGGABLE" && echo true || echo false)
+    installer=$(echo "$dumpsys_output" | grep installerPackageName | head -n 1 | cut -d'=' -f2 | xargs)
+    
 
     # 필수 필드 중 하나라도 누락 시 오류
     if [ -z "$version_name" ] || [ -z "$version_code" ] || [ -z "$target_sdk" ]; then
@@ -301,11 +301,10 @@ get_app_info() {
     echo -e "${CYAN}APK Detailed Info:${NC}"
     echo -e "  ${GREEN}versionName:${NC} ${version_name}"
     echo -e "  ${GREEN}versionCode:${NC} ${version_code}"
+    echo -e "  ${GREEN}minSdk:${NC} ${min_sdk}"
     echo -e "  ${GREEN}targetSdk:${NC} ${target_sdk}"
-    echo -e "  ${GREEN}firstInstallTime:${NC} ${first_install_time:-${YELLOW}(not available)${NC}}"
-    echo -e "  ${GREEN}lastUpdateTime:${NC} ${last_update_time:-${YELLOW}(not available)${NC}}"
+    echo -e "  ${GREEN}debuggable:${NC} ${debuggable}"
     echo -e "  ${GREEN}installerPackageName:${NC} ${installer:-${YELLOW}(not available)${NC}}"
-    echo -e "  ${GREEN}dataDir:${NC} ${data_dir:-${YELLOW}(not available)${NC}}"
     echo ""
 }
 
@@ -610,7 +609,7 @@ present_device_selection() {
 # 디바이스 정보 출력 함수
 pretty_device() {
     local device_id="$1"
-    local props brand model version api
+    local props brand model version api cpu
     local device_status
 
     # 디바이스 상태 확인
@@ -624,10 +623,12 @@ pretty_device() {
 
     brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
     model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
+    cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
     version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
     api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
+    
 
-    echo "$brand $model ($device_id) Android $version, API $api"
+    echo "$brand $model ($device_id) Android $version, API $api, CPU $cpu"
 }
 
 process_options() {
