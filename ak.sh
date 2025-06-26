@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.2"
-RELEASE_DATE="2025-06-13"
+VERSION="1.6.3"
+RELEASE_DATE="2025-06-26"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -120,6 +120,10 @@ usage() {
     echo -e "      Uninstall the specified package."
     echo -e "      If packageName is omitted, uses the current foreground app."
     echo
+    echo -e "  ${BOLD}clear${NC} [packageName]"
+    echo -e "      Clear app data and cache for the specified package."
+    echo -e "      If packageName is omitted, uses the current foreground app."
+    echo
     echo -e "  ${BOLD}kill${NC} <packageName1> [packageName2 ...]"
     echo -e "      Force-stop one or more specified packages."
     echo
@@ -146,6 +150,7 @@ usage() {
     echo -e "      Show this help message and usage guide."
     echo
 }
+
 # uninstall 커맨드 사용법 출력 함수
 usage_uninstall() {
     echo -e "${CYAN}${BOLD}Usage:${NC} $0 uninstall [packageName]"
@@ -208,6 +213,16 @@ usage_launch() {
     echo -e "${CYAN}${BOLD}Usage:${NC} $0 launch <packageName>"
     echo ""
     echo "Description: Launch the specified package using its launcher activity."
+    echo ""
+    exit 1
+}
+
+# clear 커맨드 사용법 출력 함수
+usage_clear_data() {
+    echo -e "${CYAN}${BOLD}Usage:${NC} $0 clear [packageName]"
+    echo ""
+    echo "Description: Clear app data and cache for the specified package."
+    echo "If 'packageName' is not provided, the script will auto-detect the currently foreground app."
     echo ""
     exit 1
 }
@@ -369,13 +384,40 @@ uninstall_package() {
     echo
     validate_package_or_exit "$package_name"
     
-    uninstall_output=$(adb -s "$G_SELECTED_DEVICE" uninstall "$package_name")
+    uninstall_output=$(adb -s "$G_SELECTED_DEVICE" uninstall "$package_name" 2>&1)
     
     if [[ "$uninstall_output" == *"Success"* ]]; then
         echo -e "${GREEN}✔ Successfully uninstalled.${NC}"
     else
         echo -e "${RED}✘ Failed to uninstall:${NC}"
         echo -e "  → $uninstall_output"
+    fi
+    echo ""
+}
+
+# clear 커맨드 함수 - 앱 데이터 삭제
+clear_data() {
+    local package_name=$1
+    local clear_output
+
+    if [ -z "$package_name" ]; then
+        package_name=$(detect_foreground_package)
+        echo -e "${YELLOW}ℹ Auto-detected package:${NC} $package_name"
+    else
+        echo -e "${BLUE}✓ Using specified package:${NC} $package_name"
+    fi
+
+    echo
+    validate_package_or_exit "$package_name"
+    
+    echo -e "${BLUE}→ Clearing app data...${NC}"
+    clear_output=$(adb -s "$G_SELECTED_DEVICE" shell pm clear "$package_name" 2>&1)
+    
+    if [[ "$clear_output" == *"Success"* ]]; then
+        echo -e "${GREEN}✔ Success${NC}"
+    else
+        echo -e "${RED}✘ Failed to clear app data:${NC}"
+        echo -e "  → $clear_output"
     fi
     echo ""
 }
@@ -456,7 +498,7 @@ kill_packages() {
     done
 }
 
- # launch 커맨드에서 앱 실행 수행
+# launch 커맨드에서 앱 실행 수행
 launch_package() {
     local package_name=$1
     local launch_intent start_result
@@ -620,6 +662,13 @@ process_options() {
             fi
             find_and_select_device
             uninstall_package "$@"
+            ;;
+        clear)
+            if [ "$#" -gt 1 ]; then
+                usage_clear_data
+            fi
+            find_and_select_device
+            clear_data "$@"
             ;;
         signature)
             if [ "$#" -gt 1 ]; then
