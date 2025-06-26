@@ -23,7 +23,7 @@ sudo ./ak.sh --install
 
 ## 주요 기능
 
-### `ai` - APK 설치 도구 (APK Installer)
+### `ai` - APK 설치 도구 (APK Installer) `v2.6.2`
 
 - 최신 APK, 전체 APK, 선택 APK 설치 지원
 - 여러 기기 대상 설치 가능
@@ -36,10 +36,10 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit)
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.3`
 
 - APK 추출, 정보 조회, 권한 목록 확인
-- 앱 제거, 강제 종료, 실행
+- 앱 제거, 데이터 삭제, 강제 종료, 실행
 - 디바이스 목록 출력
 - SHA-256 서명 해시 추출 (apksigner 사용)
 
