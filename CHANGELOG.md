@@ -2,6 +2,19 @@
 
 모든 주요 변경 사항이 이 파일에 기록됩니다.
 
+## [2025-06-27]
+
+### ADB Kit (ak) v1.6.4
+- 앱 정보 출력 기능 개선 (`info` 명령어)
+  - `minSdk` 항목 추가 - 앱의 최소 지원 SDK 버전 표시
+  - `debuggable` 항목 추가 - 앱의 디버그 가능 여부 표시
+  - `versionName`, `versionCode`, `installer` 항목의 공백 제거 처리 (`xargs` 추가)
+  - 불필요한 정보 제거 (`firstInstallTime`, `lastUpdateTime`, `dataDir` 출력 제거)
+  - 출력 정보 최적화로 핵심 정보에 집중
+- 디바이스 정보 출력 개선 (`devices` 명령어)
+  - CPU 아키텍처 정보 추가 (예: arm64-v8a, armeabi-v7a 등)
+  - 디바이스 식별에 도움이 되는 하드웨어 정보 제공
+
 ## [2025-06-26]
 
 ### ADB Kit (ak) v1.6.3

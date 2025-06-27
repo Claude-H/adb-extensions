@@ -36,7 +36,7 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.3`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.4`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행
@@ -126,7 +126,7 @@ ak <명령어> [패키지명] [추가 인자...]
 | 명령어        | 사용 예시 | 설명 |
 |---------------|-----------|------|
 | `pull`        | `ak pull [packageName] [outputFile]` | 지정한 앱의 APK 파일을 로컬로 저장합니다. 출력 파일명을 생략하면 `[packageName].apk`로 저장됩니다. |
-| `info`        | `ak info [packageName]` | 앱의 버전, 설치 시점, 데이터 경로 등 핵심 정보를 조회합니다. |
+| `info`        | `ak info [packageName]` | 앱의 버전, SDK 정보, 디버그 가능 여부 등 핵심 정보를 조회합니다. |
 | `permissions` | `ak permissions [packageName]` | 앱이 요청한 권한 목록을 출력합니다. |
 | `uninstall`   | `ak uninstall [packageName]` | 앱을 디바이스에서 제거합니다. |
 | `clear`       | `ak clear [packageName]` | 앱의 데이터와 캐시를 삭제합니다. |
