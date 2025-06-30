@@ -36,7 +36,7 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.4`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.5`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행
@@ -129,8 +129,8 @@ ak <명령어> [패키지명] [추가 인자...]
 | `info`        | `ak info [packageName]` | 앱의 버전, SDK 정보, 디버그 가능 여부 등 핵심 정보를 조회합니다. |
 | `permissions` | `ak permissions [packageName]` | 앱이 요청한 권한 목록을 출력합니다. |
 | `uninstall`   | `ak uninstall [packageName]` | 앱을 디바이스에서 제거합니다. |
-| `clear`       | `ak clear [packageName]` | 앱의 데이터와 캐시를 삭제합니다. |
-| `kill`        | `ak kill <packageName1> [packageName2 ...]` | 하나 이상의 앱 프로세스를 강제 종료합니다. 첫 번째 패키지명은 필수이며, 이후는 선택적으로 추가할 수 있습니다. |
+| `clear`       | `ak clear [packageName] [packageName2 ...]` | 하나 이상의 앱 데이터와 캐시를 삭제합니다. |
+| `kill`        | `ak kill [packageName1] [packageName2 ...]` | 하나 이상의 앱 프로세스를 강제 종료합니다. |
 | `devices`     | `ak devices` | 연결된 디바이스 목록과 상태 정보를 출력합니다. |
 | `launch`      | `ak launch [packageName]` | 앱의 런처 액티비티를 실행합니다. |
 | `signature`   | `ak signature [packageName]` | 앱의 SHA-256 서명 해시를 출력합니다. `ANDROID_HOME` 환경 변수가 설정되어 있어야 합니다. |
@@ -157,12 +157,16 @@ ak permissions com.android.chrome          # Chrome 앱의 권한 목록
 # 앱 데이터 관리
 ak clear                                   # 포그라운드 앱의 데이터 삭제
 ak clear com.example.app                   # 특정 앱의 데이터 삭제
+ak clear com.app1 com.app2 com.app3        # 여러 앱 동시 데이터 삭제
+
 ak uninstall                               # 포그라운드 앱 제거
 ak uninstall com.example.testapp           # 테스트 앱 제거
 
 # 앱 프로세스 관리
+ak kill                                    # 포그라운드 앱 강제 종료
 ak kill com.example.app                    # 특정 앱 강제 종료
 ak kill com.app1 com.app2 com.app3         # 여러 앱 동시 강제 종료
+
 ak launch com.android.settings             # 설정 앱 실행
 
 # 디바이스 관리
