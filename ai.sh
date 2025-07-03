@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.6.2"
-RELEASE_DATE="2025-06-13"
+VERSION="2.6.3"
+RELEASE_DATE="2025-07-02"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -26,8 +26,27 @@ GARROW="${GREEN}==>${NC}"
 ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
 
 show_version() {
-  echo "$0 ${VERSION} Released on ${RELEASE_DATE}"
-  echo "Designed and Developed by Claude Hwang"
+  local script_name=$(basename "$0")
+  local os_info=$(uname -s)
+  local shell_info=$(basename "$SHELL")
+  local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
+  local uptime_info=$(uptime | awk -F'up ' '{print $2}' | awk -F',' '{print $1}' | xargs)
+  
+  echo
+  
+  echo -e "        ${GREEN}::${NC}                   ${GREEN}.::${NC}        ${BOLD}${script_name}${NC} ${GREEN}${VERSION}${NC} - Released on ${RELEASE_DATE}"
+  echo -e "       ${GREEN}:#*+.${NC}                ${GREEN}:+*#.${NC}       ------------------------------------"
+  echo -e "        ${GREEN}:**+:${NC}    ${GREEN}......${NC}    ${GREEN}-+**.${NC}        ${BOLD}${YELLOW}ADB Version:${NC} ${adb_version}"
+  echo -e "         ${GREEN}.*+=---::::::::---+*+${NC}          ${BOLD}${YELLOW}Author:${NC} Claude Hwang"
+  echo -e "        ${YELLOW}:-=----:--------:---==-.${NC}        ${BOLD}${YELLOW}License:${NC} MIT"
+  echo -e "      ${YELLOW}:++=---==============---=+=.${NC}      ${BOLD}${YELLOW}Language:${NC} Bash"
+  echo -e "    ${RED}.+*+=+*%#++++++++++++++##+=+**-${NC}     ${BOLD}${YELLOW}Supported OS:${NC} macOS, Linux"
+  echo -e "   ${RED}.****+%@@%+++++++++++++*@@@#+**#+${NC}    ${BOLD}${YELLOW}Dependencies:${NC} adb"
+  echo -e "   ${CYAN}*#*****#*+++++++++++++++*##*****#=${NC}   ${BOLD}${YELLOW}Repository:${NC} https://github.com/Claude-H/adb-extensions"
+  echo -e "  ${BLUE}-%#*****++++++++++++++++++++****##%.${NC}  "
+  echo -e "                                        ${BOLD}${YELLOW}Purpose:${NC} APK installation tool"
+  echo -e "                                        ${BOLD}${YELLOW}Features:${NC} Multi-device, Interactive selection"
+  echo
 }
 
 # 스크립트 설명과 사용법

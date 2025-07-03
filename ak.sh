@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.5"
-RELEASE_DATE="2025-06-30"
+VERSION="1.6.6"
+RELEASE_DATE="2025-07-02"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -91,8 +91,25 @@ contains() {
 }
 
 show_version() {
-  echo "$0 ${VERSION} Released on ${RELEASE_DATE}"
-  echo "Designed and Developed by Claude Hwang"
+  local script_name=$(basename "$0")
+  local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
+  
+  
+  echo
+  
+  echo -e "        ${GREEN}::${NC}                   ${GREEN}.::${NC}        ${BOLD}${script_name}${NC} ${GREEN}${VERSION}${NC} - Released on ${RELEASE_DATE}"
+  echo -e "       ${GREEN}:#*+.${NC}                ${GREEN}:+*#.${NC}       ------------------------------------"
+  echo -e "        ${GREEN}:**+:${NC}    ${GREEN}......${NC}    ${GREEN}-+**.${NC}        ${BOLD}${YELLOW}ADB Version:${NC} ${adb_version}"
+  echo -e "         ${GREEN}.*+=---::::::::---+*+${NC}          ${BOLD}${YELLOW}Author:${NC} Claude Hwang"
+  echo -e "        ${YELLOW}:-=----:--------:---==-.${NC}        ${BOLD}${YELLOW}License:${NC} MIT"
+  echo -e "      ${YELLOW}:++=---==============---=+=.${NC}      ${BOLD}${YELLOW}Language:${NC} Bash"
+  echo -e "    ${RED}.+*+=+*%#++++++++++++++##+=+**-${NC}     ${BOLD}${YELLOW}Supported OS:${NC} macOS, Linux"
+  echo -e "   ${RED}.****+%@@%+++++++++++++*@@@#+**#+${NC}    ${BOLD}${YELLOW}Dependencies:${NC} adb, apksigner"
+  echo -e "   ${CYAN}*#*****#*+++++++++++++++*##*****#=${NC}   ${BOLD}${YELLOW}Repository:${NC} https://github.com/Claude-H/adb-extensions"
+  echo -e "  ${BLUE}-%#*****++++++++++++++++++++****##%.${NC}  "
+  echo -e "                                        ${BOLD}${YELLOW}Purpose:${NC} ADB toolkit for Android development"
+  echo -e "                                        ${BOLD}${YELLOW}Features:${NC} Device management, App control, APK tools"
+  echo
 }
 
 # 사용법 출력 함수
