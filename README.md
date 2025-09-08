@@ -36,7 +36,7 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.5`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.7`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행
@@ -133,7 +133,7 @@ ak <명령어> [패키지명] [추가 인자...]
 | `kill`        | `ak kill [packageName1] [packageName2 ...]` | 하나 이상의 앱 프로세스를 강제 종료합니다. |
 | `devices`     | `ak devices` | 연결된 디바이스 목록과 상태 정보를 출력합니다. |
 | `launch`      | `ak launch [packageName]` | 앱의 런처 액티비티를 실행합니다. |
-| `signature`   | `ak signature [packageName]` | 앱의 SHA-256 서명 해시를 출력합니다. `ANDROID_HOME` 환경 변수가 설정되어 있어야 합니다. |
+| `signature`   | `ak signature [packageName\|/path/to/app.apk]` | 앱의 SHA-256 서명 해시를 출력합니다. 패키지명 또는 로컬 APK 파일 경로를 지원합니다. `ANDROID_HOME` 환경 변수가 설정되어 있어야 합니다. |
 
 > `[packageName]`을 생략하면 현재 포그라운드 앱 기준으로 동작합니다.
 
@@ -148,7 +148,12 @@ ak pull com.example.app myapp.apk          # 특정 파일명으로 APK 추출
 # 앱 정보 조회
 ak info                                    # 포그라운드 앱의 상세 정보
 ak info com.android.settings               # 설정 앱의 정보 조회
-ak signature com.example.app               # SHA-256 서명 해시 출력
+
+# 서명 해시 추출
+ak signature                               # 포그라운드 앱의 SHA-256 서명 해시
+ak signature com.example.app               # 특정 패키지의 서명 해시 출력
+ak signature /path/to/app.apk              # 로컬 APK 파일의 서명 해시 출력
+ak signature ./myapp.apk                   # 상대 경로 APK 파일의 서명 해시
 
 # 권한 관리
 ak permissions                             # 포그라운드 앱의 권한 목록

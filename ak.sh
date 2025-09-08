@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.6"
-RELEASE_DATE="2025-07-02"
+VERSION="1.6.7"
+RELEASE_DATE="2025-09-09"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -43,12 +43,12 @@ is_package_installed() {
 validate_package_or_exit() {
     local package_name="$1"
     if ! validate_package_name "$package_name"; then
-        echo -e "${RED}❌ Invalid package name format:${NC} $package_name"
+        echo -e "${RED}ERROR: Invalid package name format:${NC} $package_name"
         echo
         exit 1
     fi
     if ! is_package_installed "$package_name"; then
-        echo -e "${RED}❌ Package not installed on the device:${NC} $package_name"
+        echo -e "${RED}ERROR: Package not installed on the device:${NC} $package_name"
         echo
         exit 1
     fi
@@ -61,7 +61,7 @@ get_apk_path() {
     apk_path=$(adb -s "$G_SELECTED_DEVICE" shell pm list packages -f --user 0 | grep -x "package:.*=$package_name")
 
     if [ -z "$apk_path" ]; then
-        echo -e "${RED}❌ Package not found:${NC} $package_name"
+        echo -e "${RED}ERROR: Package not found:${NC} $package_name"
         echo
         return 1
     fi
@@ -69,7 +69,7 @@ get_apk_path() {
     apk_path=$(echo "$apk_path" | sed -n 's/package:\(.*base\.apk\)=.*/\1/p')
 
     if [ -z "$apk_path" ]; then
-        echo -e "${RED}❌ Failed to extract APK path for package:${NC} $package_name"
+        echo -e "${RED}ERROR: Failed to extract APK path for package:${NC} $package_name"
         echo
         return 1
     fi
@@ -151,10 +151,10 @@ usage() {
     echo -e "  ${BOLD}launch${NC} <packageName>"
     echo -e "      Launch the specified package using its launcher activity."
     echo
-    echo -e "  ${BOLD}signature${NC} [packageName]"
-    echo -e "      Extract SHA-256 signature hash of the app using apksigner."
-    echo -e "      Requires APK pull and ANDROID_HOME to be set."
-    echo -e "      If packageName is omitted, uses the current foreground app."
+    echo -e "  ${BOLD}signature${NC} [packageName|/path/to/app.apk]"
+    echo -e "      Extract SHA-256 signature hash using apksigner."
+    echo -e "      Supports both package names and local APK file paths."
+    echo -e "      Requires ANDROID_HOME to be set. If no argument, uses foreground app."
     echo
     echo -e "${CYAN}${BOLD}Options:${NC}"
     echo -e "  ${BOLD}--install${NC}"
@@ -193,9 +193,9 @@ pull_apk() {
     echo    
     if [ -z "$package_name" ]; then
         package_name=$(detect_foreground_package)
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
     else
-        echo -e "${BLUE}✅ Using specified package:${NC} $package_name"
+        echo -e "${BLUE}Using specified package:${NC} $package_name"
     fi
     
     echo
@@ -216,11 +216,11 @@ pull_apk() {
     adb -s "$G_SELECTED_DEVICE" pull "$apk_path" "$save_apk_file_name"
     if [ $? -ne 0 ]; then
         echo
-        echo -e "${RED}❌ Failed to pull APK from device. Check device connection and permissions.${NC}"
+        echo -e "${RED}ERROR: Failed to pull APK from device. Check device connection and permissions.${NC}"
         exit 1
     fi
 
-    echo -e "${GREEN}✅ APK file saved as:${NC} $save_apk_file_name"
+    echo -e "${GREEN}APK file saved as:${NC} $save_apk_file_name"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -245,9 +245,9 @@ get_app_info() {
     echo
     if [ -z "$package_name" ]; then
         package_name=$(detect_foreground_package)
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
     else
-        echo -e "${BLUE}✅ Using specified package:${NC} $package_name"
+        echo -e "${BLUE}Using specified package:${NC} $package_name"
     fi
     
     echo
@@ -266,7 +266,7 @@ get_app_info() {
 
     # 필수 필드 중 하나라도 누락 시 오류
     if [ -z "$version_name" ] || [ -z "$version_code" ] || [ -z "$target_sdk" ]; then
-        echo -e "${RED}❌ Critical app info missing for package:${NC} $package_name"
+        echo -e "${RED}ERROR: Critical app info missing for package:${NC} $package_name"
         echo -e "${RED}  ==> versionName, versionCode, or targetSdk could not be retrieved.${NC}"
         echo
         exit 1
@@ -288,59 +288,84 @@ get_app_info() {
 
 # signature 커맨드 사용법 출력 함수
 usage_signature() {
-    echo -e "${CYAN}${BOLD}Usage:${NC} $0 signature [packageName]"
+    echo -e "${CYAN}${BOLD}Usage:${NC} $0 signature [packageName|/path/to/app.apk]"
     echo
-    echo "Description: Pull the APK of the specified package, extract the SHA-256"
-    echo "certificate digest using apksigner, then remove the temporary APK file."
+    echo "Description: Extract the SHA-256 certificate digest using apksigner."
+    echo "You can provide either a package name or a local APK file path."
     echo "ANDROID_HOME must be set and contain valid build-tools with apksigner."
-    echo "If 'packageName' is not provided, the script will auto-detect the current foreground app."
+    echo
+    echo "Options:"
+    echo "  packageName     - Package name installed on the device (e.g., com.example.app)"
+    echo "  /path/to/app.apk - Local APK file path (must end with .apk)"
+    echo "  (no argument)   - Auto-detect the current foreground app"
     echo
     exit 1
 }
 
 # signature 커맨드 함수 - APK 추출 후 apksigner로 SHA-256 서명 해시 추출
 get_signature_info() {
-    local package_name=$1
-    local tmp_apk apk_path apksigner signature_output
+    local input_param=$1
+    local tmp_apk apk_path apksigner signature_output is_local_apk=false
 
     echo
-    if [ -z "$package_name" ]; then
-        package_name=$(detect_foreground_package)
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+    
+    # 입력 파라미터가 없으면 포그라운드 앱 자동 감지
+    if [ -z "$input_param" ]; then
+        input_param=$(detect_foreground_package)
+        echo -e "${YELLOW}Auto-detected package:${NC} $input_param"
+    # 입력이 .apk로 끝나면 로컬 APK 파일로 간주
+    elif [[ "$input_param" == *.apk ]]; then
+        is_local_apk=true
+        echo -e "${BLUE}Using local APK file:${NC} $input_param"
+        
+        # 로컬 APK 파일 존재 여부 확인
+        if [ ! -f "$input_param" ]; then
+            echo -e "${RED}ERROR: Local APK file not found:${NC} $input_param"
+            echo
+            exit 1
+        fi
+        
+        # 절대 경로로 변환
+        apk_path=$(realpath "$input_param")
+        echo -e "${GREEN}==> Using APK file:${NC} $apk_path"
     else
-        echo -e "${BLUE}✅ Using specified package:${NC} $package_name"
+        echo -e "${BLUE}Using specified package:${NC} $input_param"
+        validate_package_or_exit "$input_param"
     fi
 
     echo
-    validate_package_or_exit "$package_name"
 
-    tmp_apk="tmp_signature_${package_name}.apk"
-    apk_path=$(get_apk_path "$package_name") || exit 1
-    if [ -z "$apk_path" ]; then
-        echo -e "${RED}❌ Could not determine APK path for package:${NC} $package_name"
-        exit 1
-    fi
+    # 로컬 APK 파일이 아닌 경우 디바이스에서 APK 추출
+    if [ "$is_local_apk" = false ]; then
+        tmp_apk="tmp_signature_${input_param}.apk"
+        apk_path=$(get_apk_path "$input_param") || exit 1
+        if [ -z "$apk_path" ]; then
+            echo -e "${RED}ERROR: Could not determine APK path for package:${NC} $input_param"
+            exit 1
+        fi
 
-    echo -e "${BLUE}==> Pulling APK...${NC}"
-    adb -s "$G_SELECTED_DEVICE" pull "$apk_path" "$tmp_apk" > /dev/null
-    if [ $? -ne 0 ]; then
+        echo -e "${BLUE}==> Pulling APK from device...${NC}"
+        adb -s "$G_SELECTED_DEVICE" pull "$apk_path" "$tmp_apk" > /dev/null
+        if [ $? -ne 0 ]; then
+            echo
+            echo -e "${RED}ERROR: Failed to pull APK from device. Check device connection and permissions.${NC}"
+            rm -f "$tmp_apk"
+            exit 1
+        fi
+        apk_path="$tmp_apk"
         echo
-        echo -e "${RED}❌ Failed to pull APK from device. Check device connection and permissions.${NC}"
-        rm -f "$tmp_apk"
-        exit 1
     fi
-    echo
 
     # Find latest apksigner
     apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
     if [ ! -x "$apksigner" ]; then
-        echo -e "${RED}❌ apksigner not found or not executable.${NC}"
-        rm -f "$tmp_apk"
+        echo -e "${RED}ERROR: apksigner not found or not executable.${NC}"
+        [ "$is_local_apk" = false ] && rm -f "$tmp_apk"
         exit 1
     fi
 
     echo -e "${BLUE}==> Extracting signature with apksigner...${NC}"
-    signature_output=$("$apksigner" verify --print-certs "$tmp_apk" 2>&1)
+    signature_output=$("$apksigner" verify --print-certs "$apk_path" 2>&1)
 
     echo "$signature_output" | grep -v '^WARNING:' | while IFS= read -r line; do
         if echo "$line" | grep -q 'SHA-256'; then
@@ -351,12 +376,13 @@ get_signature_info() {
     done
 
     if echo "$signature_output" | grep -q 'DOES NOT VERIFY'; then
-        echo -e "${YELLOW}⚠️ APK is not fully verifiable. It may be a pre-installed system app or missing v1 signature.${NC}"
+        echo -e "${YELLOW}WARNING: APK is not fully verifiable. It may be a pre-installed system app or missing v1 signature.${NC}"
     fi
 
     echo
-    rm -f "$tmp_apk"
-    echo -e "${GREEN}✅ Signature extraction complete.${NC}"
+    # 임시 파일이 생성된 경우에만 삭제
+    [ "$is_local_apk" = false ] && rm -f "$tmp_apk"
+    echo -e "${GREEN}Signature extraction complete.${NC}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -381,9 +407,9 @@ uninstall_package() {
     echo
     if [ -z "$package_name" ]; then
         package_name=$(detect_foreground_package)
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
     else
-        echo -e "${BLUE}✅ Using specified package:${NC} $package_name"
+        echo -e "${BLUE}Using specified package:${NC} $package_name"
     fi
 
     echo
@@ -392,9 +418,9 @@ uninstall_package() {
     uninstall_output=$(adb -s "$G_SELECTED_DEVICE" uninstall "$package_name" 2>&1)
     
     if [[ "$uninstall_output" == *"Success"* ]]; then
-        echo -e "${GREEN}✅ Successfully uninstalled.${NC}"
+        echo -e "${GREEN}Successfully uninstalled.${NC}"
     else
-        echo -e "${RED}❌ Failed to uninstall:${NC}"
+        echo -e "${RED}ERROR: Failed to uninstall:${NC}"
         echo -e "  ==> $uninstall_output"
     fi
     echo
@@ -422,9 +448,9 @@ get_permissions() {
     echo
     if [ -z "$package_name" ]; then
         package_name=$(detect_foreground_package)
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
     else
-        echo -e "${BLUE}✅ Using specified package:${NC} $package_name"
+        echo -e "${BLUE}Using specified package:${NC} $package_name"
     fi
     
     echo
@@ -435,7 +461,7 @@ get_permissions() {
 
     # 결과 출력
     if [ -z "$permissions" ]; then
-        echo -e "${RED}❌ No permissions found or failed to retrieve permissions for package:${NC} $package_name"
+        echo -e "${RED}ERROR: No permissions found or failed to retrieve permissions for package:${NC} $package_name"
         echo
         exit 1
     fi
@@ -467,7 +493,7 @@ kill_packages() {
     if [ "$#" -eq 0 ]; then
         package_name=$(detect_foreground_package)
         echo
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
         validate_package_or_exit "$package_name"
         execute_kill_package "$package_name"
         return
@@ -478,17 +504,17 @@ kill_packages() {
     for package_name in "$@"; do
         if ! validate_package_name "$package_name"; then
             echo
-            echo -e "${RED}❌ Invalid package name format:${NC} $package_name"
+            echo -e "${RED}ERROR: Invalid package name format:${NC} $package_name"
             continue
         fi
         if ! is_package_installed "$package_name"; then
             echo
-            echo -e "${RED}❌ Package not installed on the device:${NC} $package_name"
+            echo -e "${RED}ERROR: Package not installed on the device:${NC} $package_name"
             continue
         fi
         if contains "$package_name" "${seen_packages[@]}"; then
             echo
-            echo -e "${YELLOW}⚠️ Skipping duplicate package:${NC} $package_name"
+            echo -e "${YELLOW}WARNING: Skipping duplicate package:${NC} $package_name"
             continue
         fi
 
@@ -505,9 +531,9 @@ execute_kill_package() {
     echo -e "${YELLOW}==> Attempting to kill:${NC} $package_name"
     adb -s "$G_SELECTED_DEVICE" shell am force-stop "$package_name"
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Successfully killed${NC}"
+        echo -e "${GREEN}Successfully killed${NC}"
     else
-        echo -e "${RED}❌ Failed to kill:${NC} $package_name (may not be installed or running)"
+        echo -e "${RED}ERROR: Failed to kill:${NC} $package_name (may not be installed or running)"
     fi
 }
 
@@ -533,7 +559,7 @@ clear_data() {
     if [ "$#" -eq 0 ]; then
         package_name=$(detect_foreground_package)
         echo
-        echo -e "${YELLOW}🔍 Auto-detected package:${NC} $package_name"
+        echo -e "${YELLOW}Auto-detected package:${NC} $package_name"
         validate_package_or_exit "$package_name"
         execute_clear_package "$package_name"
         return
@@ -544,17 +570,17 @@ clear_data() {
     for package_name in "$@"; do
         if ! validate_package_name "$package_name"; then
             echo
-            echo -e "${RED}❌ Invalid package name format:${NC} $package_name"
+            echo -e "${RED}ERROR: Invalid package name format:${NC} $package_name"
             continue
         fi
         if ! is_package_installed "$package_name"; then
             echo
-            echo -e "${RED}❌ Package not installed on the device:${NC} $package_name"
+            echo -e "${RED}ERROR: Package not installed on the device:${NC} $package_name"
             continue
         fi
         if contains "$package_name" "${seen_packages[@]}"; then
             echo
-            echo -e "${YELLOW}⚠️ Skipping duplicate package:${NC} $package_name"
+            echo -e "${YELLOW}WARNING: Skipping duplicate package:${NC} $package_name"
             continue
         fi
 
@@ -574,9 +600,9 @@ execute_clear_package() {
     clear_output=$(adb -s "$G_SELECTED_DEVICE" shell pm clear "$package_name" 2>&1)
     
     if [[ "$clear_output" == *"Success"* ]]; then
-        echo -e "${GREEN}✅ Successfully cleared data${NC}"
+        echo -e "${GREEN}Successfully cleared data${NC}"
     else
-        echo -e "${RED}❌ Failed to clear app data:${NC} $package_name"
+        echo -e "${RED}ERROR: Failed to clear app data:${NC} $package_name"
         echo -e "  ==> $clear_output"
     fi
 }
@@ -601,7 +627,7 @@ launch_package() {
     local launch_intent start_result
     
     if [ -z "$package_name" ]; then
-        echo -e "${RED}❌ Package name is required for launch.${NC}"
+        echo -e "${RED}ERROR: Package name is required for launch.${NC}"
         echo
         echo -e "${CYAN}${BOLD}Usage:${NC} $0 launch [packageName]"
         echo
@@ -612,19 +638,19 @@ launch_package() {
 
     if ! is_package_installed "$package_name"; then
         echo
-        echo -e "${RED}❌ Package not installed on the device:${NC} $package_name"
+        echo -e "${RED}ERROR: Package not installed on the device:${NC} $package_name"
         exit 1
     fi
 
     launch_intent=$(adb -s "$G_SELECTED_DEVICE" shell cmd package resolve-activity --brief "$package_name" 2>&1 | tail -n 1)
     start_result=$(adb -s "$G_SELECTED_DEVICE" shell am start --user 0 -n "$launch_intent" 2>&1)
     if echo "$start_result" | grep -q "Exception occurred while executing 'start'"; then
-        echo -e "${RED}❌ Failed to launch app. Reason:${NC}"
+        echo -e "${RED}ERROR: Failed to launch app. Reason:${NC}"
         echo "  ${start_result//$'\n'/$'\n  '}"
         echo
         exit 1
     fi
-    echo -e "${GREEN}✅ Successfully launched package:${NC} $package_name"
+    echo -e "${GREEN}Successfully launched package:${NC} $package_name"
     echo
 }
 
@@ -643,7 +669,7 @@ find_and_list_devices() {
         G_DEVICES+=("$line")
     done < <(adb devices)
     if [ -z "${G_DEVICES[*]}" ]; then
-        echo -e "${RED}❌ No connected devices found.${NC}"
+        echo -e "${RED}ERROR: No connected devices found.${NC}"
         return
     fi
 
@@ -666,20 +692,20 @@ find_and_list_devices() {
                 version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
                 api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
                 
-                echo -e "  ${GREEN}✅ ${brand} ${model}${NC}"
+                echo -e "  ${GREEN}${brand} ${model}${NC}"
                 echo -e "     ID: ${BOLD}${device_id}${NC}  │  Android: ${BOLD}${version} (API ${api})${NC}  │  CPU: ${BOLD}${cpu}${NC}"
                 # printf "     ID: ${BOLD}%-16s${NC}│ Android: ${BOLD}%-16s${NC}│ CPU: ${BOLD}%s${NC}\n" "${device_id}" "${version} (API ${api})" "${cpu}"
                 ;;
             unauthorized)
-                echo -e "  ${RED}🔒 UNAUTHORIZED DEVICE${NC} (USB debugging not authorized)"
+                echo -e "  ${RED}UNAUTHORIZED DEVICE${NC} (USB debugging not authorized)"
                 echo -e "     ID: ${BOLD}${device_id}${NC}"
                 ;;
             offline)
-                echo -e "  ${PURPLE}📴 OFFLINE DEVICE${NC} (Device disconnected)"
+                echo -e "  ${PURPLE}OFFLINE DEVICE${NC} (Device disconnected)"
                 echo -e "     ID: ${BOLD}${device_id}${NC}"
                 ;;
             *)
-                echo -e "  ${YELLOW}❓ UNKNOWN STATUS${NC} (${status})"
+                echo -e "  ${YELLOW}UNKNOWN STATUS${NC} (${status})"
                 echo -e "     ID: ${BOLD}${device_id}${NC}"
                 ;;
         esac
@@ -798,7 +824,10 @@ process_options() {
             if [ "$#" -gt 1 ]; then
                 usage_signature
             fi
-            find_and_select_device
+            # 로컬 APK 파일이 아닌 경우에만 디바이스 선택
+            if [ "$#" -eq 0 ] || [[ "$1" != *.apk ]]; then
+                find_and_select_device
+            fi
             get_signature_info "$@"
             ;;
         clear)
@@ -825,7 +854,7 @@ process_options() {
             usage
             ;;
         *)
-            echo -e "${RED}❌ Error: Unknown command '${command}'${NC}"
+            echo -e "${RED}ERROR: Unknown command '${command}'${NC}"
             echo
             usage
             exit 1
