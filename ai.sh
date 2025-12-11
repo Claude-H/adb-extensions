@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.6.3"
-RELEASE_DATE="2025-07-02"
+VERSION="2.7.0"
+RELEASE_DATE="2025-12-11"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -65,13 +65,17 @@ show_help() {
   echo -e "\t\tRecommended usage: ${BOLD}sudo ./ai.sh --install${NC}"
   echo
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"
+  echo -e "  (none)\t\tSelect APK files interactively from the current directory (default)."
+  echo -e "  <directories>\tSelect APK files interactively from the specified directories."
+  echo -e "  <apk files>\tDirectly specify APK files to install."
   echo -e "  -l\t\tInstall the latest APK file from the current directory."
   echo -e "  -a\t\tInstall all APK files from the current directory."
-  echo -e "  -s [pattern]\tSelect APK files from the current directory interactively."
-  echo -e "\t\tOptional pattern to filter APK files."
-  echo -e "\t\tExamples:"
-  echo -e "\t\t  -s debug\t\tFind APKs containing 'debug'"
-  echo -e "\t\t  -s \"myapp release\"\tFind APKs containing both 'myapp' and 'release'"
+  echo -e "  -p <pattern>\tFilter and select APK files matching the pattern interactively."
+  echo -e "\t\t\tPattern is REQUIRED. Can be used with directory."
+  echo -e "\t\t\tExamples:"
+  echo -e "\t\t\t  -p debug\t\t\tFind APKs containing 'debug' in current dir"
+  echo -e "\t\t\t  -p \"myapp release\"\t\tFind APKs containing both 'myapp' and 'release'"
+  echo -e "\t\t\t  -p debug /path/to/folder\tFind APKs in specified folder"
   echo
   echo -e "${BOLD}Device Options:${NC}"
   echo -e "  -m\t\tInstall APK files on all connected devices."
@@ -91,19 +95,19 @@ initialize_variables() {
   opt_l_used=0
   opt_a_used=0
   opt_m_used=0
-  opt_s_used=0
+  opt_p_used=0
   filter_pattern=""  # 필터 패턴을 저장할 변수 추가
 }
 
 process_options() {
-  while getopts ":vhlamsrtd-:" opt; do
+  while getopts ":vhlamprtd-:" opt; do
     case ${opt} in
       h ) show_help; exit 0 ;;
       v ) show_version; exit 0 ;;
       l ) opt_l_used=1 ;;
       a ) opt_a_used=1 ;;
       m ) opt_m_used=1 ;;
-      s ) opt_s_used=1 ;;
+      p ) opt_p_used=1 ;;
       t | d ) install_opt+=" -$opt" ;;
       r ) ;; # '-r' 옵션은 이미 기본값으로 설정되어 있으므로 무시
       - ) case "${OPTARG}" in
@@ -116,21 +120,31 @@ process_options() {
       \? ) echo "Invalid option: $OPTARG" 1>&2; exit 1 ;;
     esac
   done
-  # 처리된 옵션을 제거한다.
-  shift $((OPTIND -1))
 
-  # -s 옵션 사용 시 첫 번째 인자를 필터 패턴으로 사용
-  if [ $opt_s_used -eq 1 ] && [ $# -gt 0 ]; then
-    filter_pattern="$1"
-    shift
+  # -p 옵션은 필수 패턴 인자 필요
+  if [ $opt_p_used -eq 1 ]; then
+    filter_pattern="${!OPTIND}"
+    if [ -z "$filter_pattern" ]; then
+      echo -e "${ERROR} Option -p requires a pattern argument."
+      echo
+      echo -e "${BOLD}Usage:${NC} ai -p <pattern> [directory]"
+      echo -e "${BOLD}Example:${NC}"
+      echo -e "  ai -p debug"
+      echo -e "  ai -p \"myapp release\""
+      echo -e "  ai -p debug /path/to/folder"
+      echo
+      echo "For interactive selection of all APKs, use: ai"
+      exit 1
+    fi
+    ((OPTIND++))
   fi
 }
 
 # 옵션 조합을 처리하는 함수
 handle_option_combinations() {
-  # '-l', '-a', '-s' 옵션 사용 여부 확인
-  if [ $opt_l_used -eq 1 ] && [ $opt_a_used -eq 1 ] && [ $opt_s_used -eq 1 ]; then
-    echo -e "${ERROR} Options -l, -a, and -s cannot be used together."
+  # '-l', '-a', '-p' 옵션 사용 여부 확인
+  if [ $opt_l_used -eq 1 ] && [ $opt_a_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
+    echo -e "${ERROR} Options -l, -a, and -p cannot be used together."
     exit 1
   fi
 
@@ -139,13 +153,13 @@ handle_option_combinations() {
     exit 1
   fi
 
-  if [ $opt_l_used -eq 1 ] && [ $opt_s_used -eq 1 ]; then
-    echo -e "${ERROR} Options -l and -s cannot be used together."
+  if [ $opt_l_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
+    echo -e "${ERROR} Options -l and -p cannot be used together."
     exit 1
   fi
 
-  if [ $opt_a_used -eq 1 ] && [ $opt_s_used -eq 1 ]; then
-    echo -e "${ERROR} Options -a and -s cannot be used together."
+  if [ $opt_a_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
+    echo -e "${ERROR} Options -a and -p cannot be used together."
     exit 1
   fi
 
@@ -163,9 +177,9 @@ validate_apk_files() {
         # 확장자가 APK 파일이 아닌 경우
         echo -e "${ERROR} Invalid file detected: '$arg'. Only APK files are allowed."
         exit 1
-      elif [ $opt_l_used -eq 1 ] || [ $opt_a_used -eq 1 ] || [ $opt_s_used -eq 1 ]; then
-        # '-l', '-a', '-s' 옵션 사용 시 APK 파일 인자를 허용하지 않음
-        echo -e "${ERROR} Options -l, -a, or -s cannot be used with APK file arguments: '$arg'."
+      elif [ $opt_l_used -eq 1 ] || [ $opt_a_used -eq 1 ] || [ $opt_p_used -eq 1 ]; then
+        # '-l', '-a', '-p' 옵션 사용 시 APK 파일 인자를 허용하지 않음
+        echo -e "${ERROR} Options -l, -a, or -p cannot be used with APK file arguments: '$arg'."
         exit 1
       fi
     fi
@@ -176,55 +190,294 @@ validate_apk_files() {
 select_apk_files() {
   apk_files=()
 
-  # '-s' 옵션 또는 인자가 없는 경우 APK 파일 선택
-  if [ $opt_s_used -eq 1 ]; then
-    select_apk_interactively
-    apk_files=("${selected_apks[@]}")
+  # '-p' 옵션 사용 시: 인자가 있으면 validate_and_collect_apk_files에서 처리 (디렉토리 지원)
+  # 인자가 없으면 select_apk_interactively 호출 (현재 디렉토리)
+  if [ $opt_p_used -eq 1 ]; then
+    if [ $# -eq 0 ]; then
+      select_apk_interactively
+      apk_files=("${selected_apks[@]}")
+    fi
+    # 인자가 있으면 아래에서 validate_and_collect_apk_files로 처리됨
   fi
 
   # '-l' 옵션 사용되었을 경우 최신 APK 파일 선택
   if [ $opt_l_used -eq 1 ]; then
-    latest_apk=$(ls -t *.apk 2>/dev/null | head -n 1)
-    [ -n "$latest_apk" ] && apk_files+=("$latest_apk")      
+    latest_apk=$(find . -maxdepth 1 -type f -name "*.apk" -print0 | xargs -0 ls -t 2>/dev/null | head -n 1)
+    [ -n "$latest_apk" ] && apk_files+=("$latest_apk")
   fi
 
   # '-a' 옵션 사용되었을 경우 모든 APK 파일 선택
   if [ $opt_a_used -eq 1 ]; then
     while IFS= read -r -d '' file; do
-      apk_files+=("$(basename "$file")")
+      apk_files+=("$file")
     done < <(find . -maxdepth 1 -type f -name "*.apk" -print0)
   fi
 
-  # 선택된 APK 파일이 없을 경우 사용자가 인자로 APK 파일을 넣었는지 검사한다.
+  # 옵션 없음 또는 -p 옵션 + 인자 있음 → APK 파일 또는 디렉토리 인자 확인
   if [ ${#apk_files[@]} -eq 0 ]; then
     validate_and_collect_apk_files "$@"
   fi
 
-  # APK 파일이 여전히 없을 경우 프로그램 종료
+  # 여전히 APK 없음 AND 인자 없음 → 인터랙티브 선택 (기본 동작)
+  if [ ${#apk_files[@]} -eq 0 ] && [ $# -eq 0 ]; then
+    select_apk_interactively
+    apk_files=("${selected_apks[@]}")
+  fi
+
+  # 여전히 APK 없음 → 에러 메시지 출력 후 종료
   if [ ${#apk_files[@]} -eq 0 ]; then
-    # echo -e "${ERROR} No valid APK files found in the current directory."
-    show_help
+    echo -e "${ERROR} No APK files found."
     exit 1
   fi
 }
 
 # 인자로 APK 파일이 있는지 확인한다.
 validate_and_collect_apk_files() {
+  local has_directories=false
+  local has_apk_files=false
+  local apk_list=()
+
+  # 1단계: 모든 인자를 검사하여 디렉토리와 APK 파일을 분류
   for arg in "$@"; do
-    # 인자가 파일이면서 .apk 확장자를 가지고 있는지 판단한다.
-    if [ -f "$arg" ] && [[ "$arg" == *.apk ]]; then
-      apk_files+=("$arg")
-    # else
-    #   echo -e "${ERROR} '$arg' is not a valid APK file in the current directory."
+    if [ -d "$arg" ]; then
+      # 디렉토리 발견 - 해당 디렉토리의 APK 수집
+      has_directories=true
+
+      while IFS= read -r -d '' file; do
+        apk_list+=("$file")
+      done < <(find "$arg" -maxdepth 1 -type f -name "*.apk" -print0)
+
+    elif [ -f "$arg" ] && [[ "$arg" == *.apk ]]; then
+      # APK 파일 발견
+      has_apk_files=true
+      apk_list+=("$arg")
     fi
+  done
+
+  # 2단계: 디렉토리나 APK가 있으면 처리
+  if [ "$has_directories" = true ] || [ "$has_apk_files" = true ]; then
+    # APK가 없으면 에러
+    if [ ${#apk_list[@]} -eq 0 ]; then
+      echo -e "${ERROR} No APK files found in the specified directories."
+      exit 1
+    fi
+
+    # APK가 1개만 있으면 자동 선택
+    if [ ${#apk_list[@]} -eq 1 ]; then
+      apk_files=("${apk_list[0]}")
+      echo -e "${BARROW} Only one APK file found: ${YELLOW}$(basename "${apk_list[0]}")${NC}"
+      return 0
+    fi
+
+    # 여러 APK가 있으면 인터랙티브 선택
+    # 패턴 필터링이 있으면 적용
+    if [ -n "$filter_pattern" ]; then
+      filtered_apks=()
+      for apk in "${apk_list[@]}"; do
+        all_patterns_match=true
+        IFS=' ' read -ra patterns <<< "$filter_pattern"
+        for pattern in "${patterns[@]}"; do
+          if ! echo "$apk" | grep -i -q "$pattern"; then
+            all_patterns_match=false
+            break
+          fi
+        done
+        if [ "$all_patterns_match" = true ]; then
+          filtered_apks+=("$apk")
+        fi
+      done
+      apk_list=("${filtered_apks[@]}")
+
+      if [ ${#apk_list[@]} -eq 0 ]; then
+        echo -e "${ERROR} No APK files found matching all patterns: ${filter_pattern}"
+        exit 1
+      fi
+
+      # 필터링 후 APK가 1개만 남으면 자동 선택
+      if [ ${#apk_list[@]} -eq 1 ]; then
+        apk_files=("${apk_list[0]}")
+        echo -e "${BARROW} Only one APK file found: ${YELLOW}$(basename "${apk_list[0]}")${NC}"
+        return 0
+      fi
+    fi
+
+    # select_multi_interactive 직접 호출
+    # 표시용 basename 배열 생성
+    local display_list=()
+    for apk in "${apk_list[@]}"; do
+      display_list+=("$(basename "$apk")")
+    done
+    
+    echo -e "${BARROW} ${BOLD}Select APK files to install${NC}\n"
+    select_multi_interactive "Select APK files" "${display_list[@]}"
+    
+    # 선택된 인덱스를 사용하여 원본 경로 매핑
+    apk_files=()
+    for idx in "${SELECTED_INDICES[@]}"; do
+      apk_files+=("${apk_list[$idx]}")
+    done
+  fi
+}
+
+# 인터랙티브 멀티 선택 함수: 방향키로 이동, Space로 선택/해제, Enter로 확정
+# 사용법: select_multi_interactive "프롬프트" "${array[@]}"
+# 결과: SELECTED_ITEMS 배열에 선택된 항목 저장, SELECTED_INDICES 배열에 선택된 인덱스 저장
+select_multi_interactive() {
+  local prompt="$1"
+  shift
+  local items=("$@")
+  local item_count=${#items[@]}
+  local focused=0
+  local key=""
+  
+  # 선택 상태 추적 (0=선택안됨, 1=선택됨)
+  declare -a selection_status=()
+  # 선택 순서 추적 (선택된 순서대로 인덱스 저장)
+  declare -a selection_order=()
+  for ((i=0; i<item_count; i++)); do
+    selection_status[$i]=0
+  done
+
+  tput civis # 커서 숨김
+
+  while true; do
+    # 헤더 출력
+    echo -e "${BLUE}==> ${BOLD}${prompt}${NC}"
+    echo
+
+    # 항목 출력
+    for i in "${!items[@]}"; do
+      local checkbox="[ ]"
+      local order_num=""
+      if [ ${selection_status[$i]} -eq 1 ]; then
+        checkbox="[✓]"
+        # 선택 순서 표시
+        for j in "${!selection_order[@]}"; do
+          if [ "${selection_order[$j]}" -eq "$i" ]; then
+            order_num=" ${YELLOW}#$((j+1))${NC}"
+            break
+          fi
+        done
+      fi
+
+      if [ $i -eq $focused ]; then
+        # 포커스된 항목 (하이라이트)
+        echo -e "${CYAN}➤ ${checkbox} ${BOLD}${WHITE}${items[$i]}${NC}${order_num}"
+      else
+        # 일반 항목
+        if [ ${selection_status[$i]} -eq 1 ]; then
+          echo -e "  ${GREEN}${checkbox}${NC} ${items[$i]}${order_num}"
+        else
+          echo -e "  ${checkbox} ${DIM}${items[$i]}${NC}"
+        fi
+      fi
+    done
+
+    # 하단 안내문
+    echo
+    echo -e "${DIM}↑/↓: Move  Space: Select/Deselect  A: Select/Deselect All  Enter: Confirm  Ctrl+C: Exit${NC}"
+
+    # 키 입력 대기
+    IFS= read -rsn1 key
+
+    # ESC 시퀀스 처리 (방향키 등)
+    if [[ $key == $'\x1b' ]]; then
+      IFS= read -rsn2 key
+      if [[ $key == "[A" ]]; then # 위쪽 화살표
+        ((focused--))
+        if [ $focused -lt 0 ]; then focused=$((item_count - 1)); fi
+      elif [[ $key == "[B" ]]; then # 아래쪽 화살표
+        ((focused++))
+        if [ $focused -ge $item_count ]; then focused=0; fi
+      fi
+    fi
+
+    # 키 동작 처리
+    case "$key" in
+      "") # Enter 키
+        # 선택된 항목 수 확인
+        local selected_count=0
+        for status in "${selection_status[@]}"; do
+          if [ $status -eq 1 ]; then
+            ((selected_count++))
+          fi
+        done
+
+        # 아무것도 선택하지 않았으면 현재 포커스된 항목 선택
+        if [ $selected_count -eq 0 ]; then
+          selection_status[$focused]=1
+          selection_order+=("$focused")
+        fi
+
+        break
+        ;;
+      "a"|"A") # A/a 키 - 전체 선택/해제 토글
+        # 모든 항목이 선택되어 있는지 확인
+        local all_selected=1
+        for status in "${selection_status[@]}"; do
+          if [ $status -eq 0 ]; then
+            all_selected=0
+            break
+          fi
+        done
+
+        if [ $all_selected -eq 1 ]; then
+          # 모두 해제
+          for ((i=0; i<item_count; i++)); do
+            selection_status[$i]=0
+          done
+          selection_order=()
+        else
+          # 모두 선택 (순서대로)
+          for ((i=0; i<item_count; i++)); do
+            selection_status[$i]=1
+            selection_order+=("$i")
+          done
+        fi
+        ;;
+      " ") # Space 키 - 선택/해제 토글
+        if [ ${selection_status[$focused]} -eq 0 ]; then
+          selection_status[$focused]=1
+          selection_order+=("$focused")
+        else
+          selection_status[$focused]=0
+          # selection_order에서 제거
+          local new_order=()
+          for idx in "${selection_order[@]}"; do
+            if [ "$idx" -ne "$focused" ]; then
+              new_order+=("$idx")
+            fi
+          done
+          selection_order=("${new_order[@]}")
+        fi
+        ;;
+    esac
+
+    # 화면 갱신을 위해 커서 이동 및 줄 지우기
+    local total_lines=$((item_count + 4))
+    for ((i=0; i<total_lines; i++)); do
+      echo -ne "\033[1A"  # 한 줄 위로
+      echo -ne "\033[2K"  # 현재 줄 지우기
+    done
+  done
+
+  tput cnorm # 커서 보이기
+  echo  # 마지막 줄바꿈
+
+  # 선택된 항목을 순서대로 전역 배열에 저장
+  SELECTED_ITEMS=()
+  SELECTED_INDICES=()
+  for idx in "${selection_order[@]}"; do
+    SELECTED_ITEMS+=("${items[$idx]}")
+    SELECTED_INDICES+=("$idx")
   done
 }
 
 # APK 선택 함수: 사용자로부터 APK 파일 선택을 받음
 select_apk_interactively() {
-  echo -e "${BARROW} ${BOLD}List of APK files in the current directory:${NC}"
+  echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
   while IFS= read -r -d '' file; do
-    apk_list+=("$(basename "$file")")
+    apk_list+=("$file")
   done < <(find . -maxdepth 1 -type f -name "*.apk" -print0)
 
   # 현재 폴더에 APK 파일이 없는 경우 에러 출력 후 종료
@@ -251,7 +504,7 @@ select_apk_interactively() {
       fi
     done
     apk_list=("${filtered_apks[@]}")
-    
+
     if [ ${#apk_list[@]} -eq 0 ]; then
       echo -e "${ERROR} No APK files found matching all patterns: '$filter_pattern'"
       exit 1
@@ -261,29 +514,23 @@ select_apk_interactively() {
   # 현재 폴더에 APK 파일이 1개인 경우 자동으로 선택
   if [ ${#apk_list[@]} -eq 1 ]; then
     selected_apks=("${apk_list[0]}")
-    echo -e "${BARROW} Only one APK file found: ${YELLOW}${apk_list[0]}${NC}"
+    echo -e "${BARROW} Only one APK file found: ${YELLOW}$(basename "${apk_list[0]}")${NC}"
     return 0
   fi
 
-  # APK 파일 목록 출력
-  local i=1
+  # 인터랙티브 선택 실행
+  # 표시용 basename 배열 생성
+  local display_list=()
   for apk in "${apk_list[@]}"; do
-    echo -e "[${i}] ${YELLOW}${apk}${NC}"
-    ((i++))
+    display_list+=("$(basename "$apk")")
   done
+  
+  select_multi_interactive "📱 Select APK files to install" "${display_list[@]}"
 
-  echo
-  read -p "Select APK files to install (enter numbers separated by comma [,]): " apk_selection
-
-  # 선택된 APK 파일을 배열로 저장
+  # 선택된 인덱스를 사용하여 원본 경로 매핑
   selected_apks=()
-  IFS=',' read -ra choices <<< "$apk_selection"
-  for choice in "${choices[@]}"; do
-    if [[ $choice =~ ^[0-9]+$ ]] && [ $choice -le ${#apk_list[@]} ] && [ $choice -ge 1 ]; then
-      selected_apks+=("${apk_list[$((choice - 1))]}")
-    else
-      echo -e "${ERROR} Invalid selection: $choice"
-    fi
+  for idx in "${SELECTED_INDICES[@]}"; do
+    selected_apks+=("${apk_list[$idx]}")
   done
 
   # 유효한 선택이 없으면 종료
@@ -318,27 +565,26 @@ find_and_select_device() {
 }
 
 present_device_selection() {
-  # 사용자에게 선택지 제공
-  echo
-  echo -e "${BARROW} ${BOLD}List of connected devices: $device_count${NC}"
-  # `$devices` 변수에 있는 디바이스 목록을 줄 단위로 분리하여 `device_list` 배열에 저장. IFS는 입력 필드 구분자를 설정.
+  # 화면 갱신: APK 선택 내용을 지우고 커서를 상단으로 이동
+  clear
+
+  # 디바이스 목록을 줄 단위로 분리하여 `device_list` 배열에 저장
   IFS=$'\n' read -rd '' -a device_list <<< "$devices"
   
-  local i=1
+  # 디바이스 정보를 pretty_device로 포맷팅한 배열 생성
+  local -a formatted_devices=()
   for device_info in "${device_list[@]}"; do
-    echo -e "[${BOLD}$i${NC}] ${YELLOW}$(pretty_device $device_info)${NC}"
-    ((i++))
+    formatted_devices+=("$(pretty_device $device_info)")
   done
-  echo
-  read -r -p "Please select a device (enter number): " device_choice
   
-  # 사용자가 입력한 번호가 유효하지 않으면 오류 메시지를 출력하고 스크립트를 종료.
-  if [ -z "${device_list[device_choice - 1]}" ]; then
-    echo -e "${ERROR} Invalid selection."
-    exit 1
-  fi
-  # 선택된 디바이스를 배열로 저장
-  selected_device=("${device_list[device_choice - 1]}")
+  # 인터랙티브 선택 실행
+  select_multi_interactive "📱 Select devices for installation" "${formatted_devices[@]}"
+  
+  # 선택된 인덱스를 사용하여 실제 디바이스 ID 배열 생성
+  selected_device=()
+  for idx in "${SELECTED_INDICES[@]}"; do
+    selected_device+=("${device_list[$idx]}")
+  done
 }
 
 # 디바이스 정보 출력 함수
@@ -361,7 +607,7 @@ pretty_print_apk_files() {
   echo -e "${BARROW} ${BOLD}The APK files to install.${NC}"
   local i=1
   for apk_file in "${apk_files[@]}"; do
-    echo "[${i}] ${apk_file}"
+    echo "[${i}] $(basename "$apk_file")"
     ((i++))
   done
 }
@@ -404,7 +650,7 @@ execute_installation() {
       # APK 파일에 .idsig 파일이 있는 경우 '--no-incremental' 옵션 추가
       if [ -f "${apk_file}.idsig" ]; then
         echo
-        echo -e "${GARROW} Detected an .idsig file associated with ${YELLOW}'${apk_file}'${NC}."
+        echo -e "${GARROW} Detected an .idsig file associated with ${YELLOW}'$(basename "$apk_file")'${NC}."
         echo -e "    Applying the ${CYAN}${BOLD}'--no-incremental'${NC} option for compatibility.${NC}"
         inner_opt+=" --no-incremental"
       fi
@@ -422,7 +668,7 @@ execute_install_command() {
   local apk_file=$3
 
   echo
-  echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} ${apk_file}${NC}"
+  echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} $(basename "$apk_file")${NC}"
   local result
   result=$(start_adb_install "$device_opt" "$install_opt" "$apk_file")
 
@@ -460,7 +706,7 @@ retry_install() {
   echo
   echo -e "${GARROW} Installation failed due to ${YELLOW}'${failure_reason}'${NC}. Retrying with ${CYAN}${BOLD}'${retry_option}'${NC} option."
   echo
-  echo -e "${BARROW} Install command: ${BOLD}adb install ${inner_opt} ${apk_file}${NC}"
+  echo -e "${BARROW} Install command: ${BOLD}adb install ${inner_opt} $(basename "$apk_file")${NC}"
 
   # 옵션을 추가하여 재설치
   local result
@@ -489,16 +735,15 @@ resolve_downgrade() {
   echo
   echo -e "${YELLOW}${BOLD}WARNING:${NC} Uninstalling will remove all application data!"
   echo
-  echo -n "Do you want to uninstall and reinstall the application [y/n]? "
-  stty -echo -icanon
-  choice=$(dd bs=1 count=1 2>/dev/null)
-  stty echo icanon
+  echo -n "Do you want to uninstall and reinstall the application? [Y/n]: "
+  read -rsn1 choice
   echo "$choice"
-
-  if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+  
+  # 엔터키나 y/Y면 진행, n/N이면 중단
+  if [[ -z "$choice" ]] || [[ "$choice" == "y" ]] || [[ "$choice" == "Y" ]]; then
     # 패키지 이름 추출
     local package_name
-    package_name=$(aapt dump badging ${apk_file} | grep package:\ name | awk -F"'" '{print $2}')
+    package_name=$(aapt dump badging "${apk_file}" | grep package:\ name | awk -F"'" '{print $2}')
 
     echo
     echo -e "${BARROW} Uninstalling package: ${BOLD}${package_name}${NC}"
@@ -507,7 +752,7 @@ resolve_downgrade() {
     if [[ $? -eq 0 ]]; then
       echo -e "${GARROW} Uninstallation successful."
       echo
-      echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} ${apk_file}${NC}"
+      echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} $(basename "$apk_file")${NC}"
       start_adb_install "$device_opt" "$install_opt" "$apk_file"
     else
       echo -e "${ERROR} Failed to uninstall the existing application."
@@ -532,13 +777,12 @@ resolve_conflict() {
   echo
   echo -e "${YELLOW}${BOLD}WARNING:${NC} Uninstalling will remove the application data!"
   echo
-  echo -n "Do you want to uninstall the existing application [y/n]? "
-  stty -echo -icanon
-  choice=$(dd bs=1 count=1 2>/dev/null)
-  stty echo icanon
+  echo -n "Do you want to uninstall the existing application? [Y/n]: "
+  read -rsn1 choice
   echo "$choice"
 
-  if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+  # 엔터키나 y/Y면 진행, n/N이면 중단
+  if [[ -z "$choice" ]] || [[ "$choice" == "y" ]] || [[ "$choice" == "Y" ]]; then
     # 패키지 이름 추출
     local package_name
     package_name=$(echo "$result" | sed -n 's/.*package \([^ ]*\).*/\1/p')
@@ -550,7 +794,7 @@ resolve_conflict() {
     if [[ $? -eq 0 ]]; then
       echo -e "${GARROW} Uninstallation successful."
       echo
-      echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} ${apk_file}${NC}"
+      echo -e "${BARROW} Install command: ${BOLD}adb install ${install_opt} $(basename "$apk_file")${NC}"
       start_adb_install "$device_opt" "$install_opt" "$apk_file"
     else
       echo -e "${ERROR} Failed to uninstall the existing application."
@@ -595,6 +839,7 @@ main() {
    # 설치 옵션 처리
   initialize_variables
   process_options "$@"
+  shift $((OPTIND -1))
   handle_option_combinations "$@"
   select_apk_files "$@"
 

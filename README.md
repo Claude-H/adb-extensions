@@ -23,15 +23,22 @@ sudo ./ak.sh --install
 
 ## 주요 기능
 
-### `ai` - APK 설치 도구 (APK Installer) `v2.6.3`
+### `ai` - APK 설치 도구 (APK Installer) `v2.7.0`
 
 - 최신 APK, 전체 APK, 선택 APK 설치 지원
 - 여러 기기 대상 설치 가능
 - `--no-incremental` 자동 적용 (.idsig 파일 존재 시)
-- ADB 설치 옵션: `-r`, `-t`, `-d` 지원
-- APK 파일 필터링 기능 (`-s` 옵션)
-  - 단일 패턴: `-s debug`
-  - 다중 패턴: `-s "myapp release"`
+- ADB 설치 옵션: `--r`, `-t`, `-d` 지원
+- 인터랙티브 APK 선택이 기본 동작
+  - `ai` 실행 시 자동으로 인터랙티브 선택 화면 표시
+- 디렉토리 지정 지원 (NEW!)
+  - 특정 폴더 지정: `ai /path/to/folder`
+  - 여러 폴더 지정: `ai /folder1 /folder2`
+  - 폴더 + APK 파일 혼용: `ai app.apk /folder`
+- APK 파일 필터링 기능 (`-p` 옵션)
+  - 단일 패턴: `-p debug`
+  - 다중 패턴: `-p "myapp release"`
+  - 디렉토리와 함께 사용: `-p debug /path/to/folder`
 - APK 파일 직접 지정 설치
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
@@ -64,10 +71,13 @@ ai [옵션] [apk파일...]
 
 | 옵션 | 설명                                      |
 |------|-------------------------------------------|
-| `-l` | 현재 디렉토리에서 가장 최신 APK 설치         |
-| `-a` | 현재 디렉토리의 모든 APK 설치                |
-| `-s [pattern]` | 설치할 APK를 사용자에게 선택하도록 인터랙티브 제공<br>- 단일 패턴: `-s debug`<br>- 다중 패턴: `-s "myapp release"` |
-| (없음) | 지정한 APK 파일들을 직접 설치<br>예: `ai app1.apk app2.apk` |
+| (없음) | 현재 디렉토리의 APK를 인터랙티브 선택 (기본 동작)<br>예: `ai` |
+| `[directories]` | 지정 디렉토리(들)의 APK를 인터랙티브 선택<br>예: `ai /path/to/folder` 또는 `ai /folder1 /folder2` |
+| `[apk_files]` | APK 파일을 직접 지정하여 설치<br>예: `ai app1.apk app2.apk` |
+| `[apk] [dir]` | APK 파일과 디렉토리를 함께 지정 (모두 인터랙티브 선택)<br>예: `ai app.apk /folder` |
+| `-l` | 현재 디렉토리에서 가장 최신 APK 설치 |
+| `-a` | 현재 디렉토리의 모든 APK 설치 |
+| `-p <pattern>` | 패턴으로 필터링하여 인터랙티브 선택 (패턴 필수)<br>디렉토리와 함께 사용 가능<br>- 현재 폴더: `-p debug`<br>- 지정 폴더: `-p debug /folder`<br>- 다중 패턴: `-p "myapp release"` |
 
 #### 디바이스 옵션
 
@@ -93,17 +103,29 @@ ai [옵션] [apk파일...]
 #### 사용 예시
 
 ```bash
+# 인터랙티브하게 모든 APK 선택 (기본 동작)
+ai
+
 # 지정한 APK 파일들을 직접 설치
 ai app1.apk app2.apk
+
+# 특정 폴더의 APK를 인터랙티브 선택 (NEW!)
+ai /path/to/folder
+
+# 특정 폴더에서 패턴 필터링하여 선택 (NEW!)
+ai -p debug /path/to/folder
+
+# APK 파일과 폴더를 함께 지정 (NEW!)
+ai app1.apk /path/to/folder
 
 # 최신 APK를 모든 기기에 설치
 ai -l -m
 
-# 디버그 버전 APK 선택하여 설치
-ai -s debug
+# 현재 폴더에서 디버그 버전 APK를 필터링하여 선택
+ai -p debug
 
-# 특정 앱의 릴리즈 버전 선택하여 설치
-ai -s "myapp release"
+# 현재 폴더에서 특정 앱의 릴리즈 버전을 필터링하여 선택
+ai -p "myapp release"
 ```
 
 ---

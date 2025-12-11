@@ -2,6 +2,60 @@
 
 모든 주요 변경 사항이 이 파일에 기록됩니다.
 
+## [2025-12-12]
+
+### ADB Installer (ai) v2.7.0 - BREAKING CHANGES
+
+**주요 UX 개선:**
+- 인터랙티브 APK 선택이 이제 기본 동작입니다
+  - `ai` 실행 시 인터랙티브 APK 선택 화면 표시
+  - 이전에는 `ai` 실행 시 help 출력 → 이제 `ai -h` 또는 `ai --help` 사용
+
+**새로운 옵션:**
+- `-p <pattern>` 옵션 추가 (필터링된 인터랙티브 선택)
+  - 패턴 인자 필수 (예: `ai -p debug`)
+  - 단일 패턴: `ai -p release`
+  - 다중 패턴: `ai -p "myapp debug"`
+  - 디렉토리와 함께 사용 가능: `ai -p debug /path/to/folder`
+
+**새로운 기능:**
+- 디렉토리 지정 기능 추가 (옵션 없이 자동 감지)
+  - 특정 폴더 지정: `ai /path/to/folder`
+  - 여러 폴더 지정: `ai /folder1 /folder2 /folder3`
+  - 폴더 + 패턴: `ai -p debug /path/to/folder`
+  - 폴더 + APK 파일 혼용: `ai app.apk /folder` (모두 인터랙티브 선택)
+  - 모든 조합 가능: `ai /folder1 /folder2 app.apk`
+
+**UX 개선:**
+- Esc 키 종료 기능 제거 → Ctrl+C로만 종료
+- APK 선택 후 디바이스 선택 화면 갱신 (clear)
+
+**제거된 옵션:**
+- `-s` 옵션 완전히 제거 (이전: `-s [pattern]`)
+  - 마이그레이션: `ai -s` → `ai`
+  - 마이그레이션: `ai -s pattern` → `ai -p pattern`
+
+**동작 요약:**
+- `ai` → 현재 폴더 APK 인터랙티브 선택 (새로운 기본값)
+- `ai /folder` → 지정 폴더 APK 인터랙티브 선택 (NEW!)
+- `ai /folder1 /folder2` → 여러 폴더 APK 모두 수집하여 인터랙티브 선택 (NEW!)
+- `ai -p <pattern>` → 현재 폴더에서 패턴 필터링 (패턴 필수)
+- `ai -p debug /folder` → 지정 폴더에서 패턴 필터링 (NEW!)
+- `ai app.apk /folder` → APK + 폴더 APK 모두 인터랙티브 선택 (NEW!)
+- `ai /folder1 app.apk /folder2` → 모든 조합 가능 (NEW!)
+- `ai -l` → 최신 APK (변경 없음)
+- `ai -a` → 모든 APK (변경 없음)
+- `ai file.apk` → 직접 설치 (변경 없음)
+
+**마이그레이션 가이드:**
+```bash
+# 이전 동작 → 새로운 동작
+ai -s           →  ai
+ai -s debug     →  ai -p debug
+ai -s "pattern" →  ai -p "pattern"
+ai              →  ai -h  (help 표시)
+```
+
 ## [2025-09-09]
 
 ### ADB Kit (ak) v1.6.7
