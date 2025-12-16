@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.6.7"
-RELEASE_DATE="2025-09-09"
+VERSION="1.7.0"
+RELEASE_DATE="2025-12-16"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -19,7 +19,12 @@ BLUE='\033[1;34m' # 파란색
 PURPLE='\033[1;35m' # 보라색
 CYAN='\033[1;36m' # 볼드와 옥색
 BOLD='\033[1m' # 볼드
+DIM='\033[2m' # 흐리게
 NC='\033[0m' # 색상 없음
+
+BARROW="${BLUE}==>${NC}"
+GARROW="${GREEN}==>${NC}"
+ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
 
 # 현재 포그라운드 앱의 패키지명을 ADB를 통해 추출
 detect_foreground_package() {
@@ -90,6 +95,102 @@ contains() {
     return 1
 }
 
+# 인터랙티브 단일 선택 함수: 방향키로 이동, 숫자(1-9)로 즉시 선택, Enter로 확정
+# 사용법: select_single_interactive "프롬프트" "${array[@]}"
+# 결과: SELECTED_ITEM 변수에 선택된 항목 저장, SELECTED_INDEX 변수에 선택된 인덱스 저장
+select_single_interactive() {
+  # 화면 갱신: 깔끔한 선택 UI를 위해 이전 내용 지우기
+  clear
+
+  local prompt="$1"
+  shift
+  local items=("$@")
+  local item_count=${#items[@]}
+  local focused=0
+  local key=""
+  
+  tput civis # 커서 숨김
+
+  while true; do
+    # 헤더 출력
+    echo -e "${BLUE}==> ${BOLD}${prompt}${NC}"
+    echo
+
+    # 항목 출력
+    for i in "${!items[@]}"; do
+      local number=$((i + 1))
+      local number_prefix=""
+      
+      # 1-9번까지만 숫자 표시
+      if [ $number -le 9 ]; then
+        number_prefix="${number}. "
+      else
+        number_prefix="○ "
+      fi
+
+      if [ $i -eq $focused ]; then
+        # 포커스된 항목 (하이라이트)
+        echo -e "${CYAN}➤ ${BOLD}${number_prefix}${items[$i]}${NC}"
+      else
+        # 일반 항목
+        echo -e "  ${number_prefix}${items[$i]}"
+      fi
+    done
+
+    # 하단 안내문
+    echo
+    if [ $item_count -le 9 ]; then
+      echo -e "${DIM}↑/↓: Navigate  1-${item_count}: Quick select  Enter: Confirm  Ctrl+C: Exit${NC}"
+    else
+      echo -e "${DIM}↑/↓: Navigate  1-9: Quick select  Enter: Confirm  Ctrl+C: Exit${NC}"
+    fi
+
+    # 키 입력 대기
+    IFS= read -rsn1 key
+
+    # ESC 시퀀스 처리 (방향키 등)
+    if [[ $key == $'\x1b' ]]; then
+      IFS= read -rsn2 key
+      if [[ $key == "[A" ]]; then # 위쪽 화살표
+        ((focused--))
+        if [ $focused -lt 0 ]; then focused=$((item_count - 1)); fi
+      elif [[ $key == "[B" ]]; then # 아래쪽 화살표
+        ((focused++))
+        if [ $focused -ge $item_count ]; then focused=0; fi
+      fi
+    fi
+
+    # 키 동작 처리
+    case "$key" in
+      "") # Enter 키
+        break
+        ;;
+      [1-9]) # 숫자 키 1-9
+        local selected_num=$((key))
+        # 유효한 범위인지 확인 (1-9 범위 내이고 아이템 개수 이내)
+        if [ $selected_num -le $item_count ]; then
+          focused=$((selected_num - 1))
+          break
+        fi
+        ;;
+    esac
+
+    # 화면 갱신을 위해 커서 이동 및 줄 지우기
+    local total_lines=$((item_count + 4))
+    for ((i=0; i<total_lines; i++)); do
+      echo -ne "\033[1A"  # 한 줄 위로
+      echo -ne "\033[2K"  # 현재 줄 지우기
+    done
+  done
+
+  tput cnorm # 커서 보이기
+  echo  # 마지막 줄바꿈
+
+  # 선택된 항목을 전역 변수에 저장
+  SELECTED_ITEM="${items[$focused]}"
+  SELECTED_INDEX=$focused
+}
+
 show_version() {
   local script_name=$(basename "$0")
   local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
@@ -151,12 +252,16 @@ usage() {
     echo -e "  ${BOLD}launch${NC} <packageName>"
     echo -e "      Launch the specified package using its launcher activity."
     echo
-    echo -e "  ${BOLD}signature${NC} [packageName|/path/to/app.apk]"
-    echo -e "      Extract SHA-256 signature hash using apksigner."
-    echo -e "      Supports both package names and local APK file paths."
-    echo -e "      Requires ANDROID_HOME to be set. If no argument, uses foreground app."
-    echo
-    echo -e "${CYAN}${BOLD}Options:${NC}"
+  echo -e "  ${BOLD}signature${NC} [packageName|/path/to/app.apk]"
+  echo -e "      Extract SHA-256 signature hash using apksigner."
+  echo -e "      Supports both package names and local APK file paths."
+  echo -e "      Requires ANDROID_HOME to be set. If no argument, uses foreground app."
+  echo
+  echo -e "  ${BOLD}activities${NC} [--all]"
+  echo -e "      Show current activity stack of the foreground task."
+  echo -e "      Use --all to show all tasks."
+  echo
+  echo -e "${CYAN}${BOLD}Options:${NC}"
     echo -e "  ${BOLD}--install${NC}"
     echo -e "      Install this script to /usr/local/bin with executable permission."
     echo -e "      Also removes macOS quarantine attributes using xattr."
@@ -655,6 +760,152 @@ launch_package() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ACTIVITIES 커맨드 - Activity Stack 조회
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# activities 커맨드 사용법 출력 함수
+usage_activities() {
+    echo -e "${CYAN}${BOLD}Usage:${NC} $0 activities [--all]"
+    echo
+    echo "Description: Display the activity stack of running applications."
+    echo
+    echo "Options:"
+    echo "  (none)  Show foreground task's activity stack (default)"
+    echo "  --all   Show all tasks' activity stacks"
+    echo
+    exit 1
+}
+
+# activities 커맨드 함수
+show_activities() {
+  local show_all=0
+  if [ "$1" = "--all" ]; then
+    show_all=1
+  fi
+  
+  echo
+  echo -e "${BLUE}==> ${BOLD}Fetching activity stack...${NC}"
+  echo
+  
+  # dumpsys 출력 가져오기
+  local dumpsys_output
+  dumpsys_output=$(adb -s "$G_SELECTED_DEVICE" shell dumpsys activity activities)
+  
+  # 포그라운드 태스크 ID 찾기
+  local foreground_task
+  foreground_task=$(echo "$dumpsys_output" | sed -n 's/.* t\([0-9]*\)}/\1/p' | head -n 1)
+  
+  if [ -z "$foreground_task" ]; then
+    echo -e "${ERROR} No foreground activity found."
+    exit 1
+  fi
+  
+  # Hist 라인 파싱
+  local activities
+  if [ $show_all -eq 1 ]; then
+    # 모든 태스크의 activities 가져오기
+    activities=$(echo "$dumpsys_output" | grep -i "Hist")
+  else
+    # 포그라운드 태스크만 필터링
+    activities=$(echo "$dumpsys_output" | grep -i "Hist" | grep "t${foreground_task}}")
+  fi
+  
+  if [ -z "$activities" ]; then
+    echo -e "${ERROR} No activities found."
+    exit 1
+  fi
+  
+  # 파싱 및 출력
+  if [ $show_all -eq 1 ]; then
+    parse_and_display_all_tasks "$dumpsys_output"
+  else
+    parse_and_display_activities "$activities" "$foreground_task"
+  fi
+}
+
+# 단일 태스크의 activities 파싱 및 출력
+parse_and_display_activities() {
+  local activities="$1"
+  local current_task="$2"
+  
+  echo -e "${BOLD}==> Activity Stack (Task ${CYAN}#${current_task}${NC})"
+  
+  local count=0
+  local max_hist=0
+  
+  # 최대 Hist 번호 찾기
+  while IFS= read -r line; do
+    local hist_num=$(echo "$line" | sed -n 's/.*Hist.*#\([0-9]*\).*/\1/p')
+    if [ -n "$hist_num" ] && [ "$hist_num" -gt "$max_hist" ]; then
+      max_hist=$hist_num
+    fi
+  done <<< "$activities"
+  
+  # 각 Hist 라인 처리
+  while IFS= read -r line; do
+    # Hist 번호 추출
+    local hist_num=$(echo "$line" | sed -n 's/.*Hist.*#\([0-9]*\).*/\1/p')
+    
+    # 패키지/액티비티 추출
+    local full_activity=$(echo "$line" | sed -n 's/.* u0 \(.*\) t[0-9]*}/\1/p')
+    
+    if [ -n "$full_activity" ]; then
+      ((count++))
+      
+      # Top Activity (최대 번호)
+      if [ "$hist_num" -eq "$max_hist" ]; then
+        echo -e "  ${CYAN}[#${hist_num}]${NC} ${full_activity}"
+      # Root (#0)
+      elif [ "$hist_num" -eq 0 ]; then
+        echo -e "  ${GREEN}[#${hist_num}]${NC} ${full_activity}"
+      # 중간 Activities
+      else
+        echo -e "  ${YELLOW}[#${hist_num}]${NC} ${full_activity}"
+      fi
+    #   echo
+    fi
+  done <<< "$activities"
+  
+  echo -e "${DIM}Total: ${count} activities in this task${NC}"
+  echo
+}
+
+# 모든 태스크 파싱 및 출력
+parse_and_display_all_tasks() {
+  local dumpsys_output="$1"
+  
+  # 모든 Hist 라인 추출
+  local all_activities
+  all_activities=$(echo "$dumpsys_output" | grep -i "Hist")
+  
+  # Task ID 목록 추출 (출력 순서 유지하면서 중복 제거)
+  local task_ids
+  task_ids=$(echo "$all_activities" | sed -n 's/.* t\([0-9]*\)}/\1/p' | awk '!seen[$0]++')
+  
+  local task_count=0
+  
+  # 각 Task별로 출력
+  while IFS= read -r task_id; do
+    if [ -n "$task_id" ]; then
+      ((task_count++))
+      
+      # 해당 Task의 activities만 필터링
+      local task_activities
+      task_activities=$(echo "$all_activities" | grep "t${task_id}}")
+      
+      if [ -n "$task_activities" ]; then
+        parse_and_display_activities "$task_activities" "$task_id"
+      fi
+    fi
+  done <<< "$task_ids"
+  
+  if [ $task_count -eq 0 ]; then
+    echo -e "${ERROR} No tasks found."
+    exit 1
+  fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # DEVICES 관리 - 디바이스 목록 및 선택
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -732,30 +983,21 @@ find_and_select_device() {
 }
 
 present_device_selection() {
-    local i device_info device_choice
     declare -a G_DEVICE_LIST
-    # 사용자에게 선택지 제공
-    echo
-    echo -e "${BARROW}${BOLD}List of connected devices: $G_DEVICE_COUNT${NC}"
-    # `$G_DEVICES` 변수에 있는 디바이스 목록을 줄 단위로 분리하여 `G_DEVICE_LIST` 배열에 저장. IFS는 입력 필드 구분자를 설정.
+    # 디바이스 목록을 줄 단위로 분리하여 `G_DEVICE_LIST` 배열에 저장
     IFS=$'\n' read -rd '' -a G_DEVICE_LIST <<< "$G_DEVICES"
-
-    i=1
+    
+    # 디바이스 정보를 pretty_device로 포맷팅한 배열 생성
+    local -a formatted_devices=()
     for device_info in "${G_DEVICE_LIST[@]}"; do
-        echo -e "[${BOLD}$i${NC}] ${YELLOW}$(pretty_device $device_info)${NC}"
-        ((i++))
+      formatted_devices+=("$(pretty_device $device_info)")
     done
-    echo
-    read -r -p "Please select a device (enter number): " device_choice
-    echo
-
-    # 사용자가 입력한 번호가 유효하지 않으면 오류 메시지를 출력하고 스크립트를 종료.
-    if [ -z "${G_DEVICE_LIST[device_choice - 1]}" ]; then
-        echo -e "${ERROR} Invalid selection."
-        exit 1
-    fi
-    # 선택된 디바이스를 배열로 저장
-    G_SELECTED_DEVICE=("${G_DEVICE_LIST[device_choice - 1]}")
+    
+    # 인터랙티브 선택 실행
+    select_single_interactive "📱 Select a device" "${formatted_devices[@]}"
+    
+    # 선택된 인덱스를 사용하여 실제 디바이스 ID 설정
+    G_SELECTED_DEVICE="${G_DEVICE_LIST[$SELECTED_INDEX]}"
 }
 
 # 디바이스 정보 출력 함수
@@ -843,6 +1085,10 @@ process_options() {
             ;;
         launch)
             launch_package "$@"
+            ;;
+        activities)
+            find_and_select_device
+            show_activities "$@"
             ;;
         --install)
             install_script

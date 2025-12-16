@@ -23,7 +23,7 @@ sudo ./ak.sh --install
 
 ## 주요 기능
 
-### `ai` - APK 설치 도구 (APK Installer) `v2.7.0`
+### `ai` - APK 설치 도구 (APK Installer) `v2.7.1`
 
 - 최신 APK, 전체 APK, 선택 APK 설치 지원
 - 여러 기기 대상 설치 가능
@@ -31,7 +31,12 @@ sudo ./ak.sh --install
 - ADB 설치 옵션: `--r`, `-t`, `-d` 지원
 - 인터랙티브 APK 선택이 기본 동작
   - `ai` 실행 시 자동으로 인터랙티브 선택 화면 표시
-- 디렉토리 지정 지원 (NEW!)
+  - **숫자키(1-9) 빠른 선택 지원** (NEW!)
+    - 1-9개 APK: 숫자 입력으로 즉시 선택 및 설치
+    - 10개 이상: 멀티 선택 전용 (Space + Enter)
+  - 방향키, Space, Enter를 활용한 멀티 선택
+  - 깔끔한 UI (선택 순서 번호 제거)
+- 디렉토리 지정 지원
   - 특정 폴더 지정: `ai /path/to/folder`
   - 여러 폴더 지정: `ai /folder1 /folder2`
   - 폴더 + APK 파일 혼용: `ai app.apk /folder`
@@ -43,12 +48,16 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.6.7`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.7.0`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행
 - 디바이스 목록 출력
 - SHA-256 서명 해시 추출 (apksigner 사용)
+- **인터랙티브 디바이스 선택** (NEW!)
+  - 방향키로 탐색, Enter로 선택
+  - 숫자키(1-9)로 빠른 선택
+  - 하이브리드 선택 방식 지원
 
 ---
 
@@ -156,6 +165,7 @@ ak <명령어> [패키지명] [추가 인자...]
 | `devices`     | `ak devices` | 연결된 디바이스 목록과 상태 정보를 출력합니다. |
 | `launch`      | `ak launch [packageName]` | 앱의 런처 액티비티를 실행합니다. |
 | `signature`   | `ak signature [packageName\|/path/to/app.apk]` | 앱의 SHA-256 서명 해시를 출력합니다. 패키지명 또는 로컬 APK 파일 경로를 지원합니다. `ANDROID_HOME` 환경 변수가 설정되어 있어야 합니다. |
+| `activities`  | `ak activities [--all]` | 현재 실행 중인 Activity 스택을 조회합니다. `--all` 옵션으로 모든 태스크 표시 가능. |
 
 > `[packageName]`을 생략하면 현재 포그라운드 앱 기준으로 동작합니다.
 
@@ -195,6 +205,10 @@ ak kill com.example.app                    # 특정 앱 강제 종료
 ak kill com.app1 com.app2 com.app3         # 여러 앱 동시 강제 종료
 
 ak launch com.android.settings             # 설정 앱 실행
+
+# Activity 스택 조회
+ak activities                              # 포그라운드 태스크의 액티비티 스택
+ak activities --all                        # 모든 태스크의 액티비티 스택
 
 # 디바이스 관리
 ak devices                                 # 연결된 디바이스 목록 확인

@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.7.0"
-RELEASE_DATE="2025-12-11"
+VERSION="2.7.1"
+RELEASE_DATE="2025-12-16"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -19,6 +19,7 @@ BLUE='\033[1;34m' # 파란색
 PURPLE='\033[1;35m' # 보라색
 CYAN='\033[1;36m' # 볼드와 옥색
 BOLD='\033[1m' # 볼드
+DIM='\033[2m' # 흐리게
 NC='\033[0m' # 색상 없음
 
 BARROW="${BLUE}==>${NC}"
@@ -190,7 +191,7 @@ validate_apk_files() {
 select_apk_files() {
   apk_files=()
 
-  # '-p' 옵션 사용 시: 인자가 있으면 validate_and_collect_apk_files에서 처리 (디렉토리 지원)
+  # '-p' 옵션 사용 시: 인자가 있으면 `validate_and_collect_apk_files`에서 처리 (디렉토리 지원)
   # 인자가 없으면 select_apk_interactively 호출 (현재 디렉토리)
   if [ $opt_p_used -eq 1 ]; then
     if [ $# -eq 0 ]; then
@@ -323,6 +324,9 @@ validate_and_collect_apk_files() {
 # 사용법: select_multi_interactive "프롬프트" "${array[@]}"
 # 결과: SELECTED_ITEMS 배열에 선택된 항목 저장, SELECTED_INDICES 배열에 선택된 인덱스 저장
 select_multi_interactive() {
+  # 화면 갱신: 깔끔한 선택 UI를 위해 이전 내용 지우기
+  clear
+
   local prompt="$1"
   shift
   local items=("$@")
@@ -348,34 +352,35 @@ select_multi_interactive() {
     # 항목 출력
     for i in "${!items[@]}"; do
       local checkbox="[ ]"
-      local order_num=""
+      local number=$((i + 1))
+      local number_prefix="${number}. "
+      
       if [ ${selection_status[$i]} -eq 1 ]; then
         checkbox="[✓]"
-        # 선택 순서 표시
-        for j in "${!selection_order[@]}"; do
-          if [ "${selection_order[$j]}" -eq "$i" ]; then
-            order_num=" ${YELLOW}#$((j+1))${NC}"
-            break
-          fi
-        done
       fi
 
       if [ $i -eq $focused ]; then
         # 포커스된 항목 (하이라이트)
-        echo -e "${CYAN}➤ ${checkbox} ${BOLD}${WHITE}${items[$i]}${NC}${order_num}"
+        echo -e "${CYAN}➤ ${checkbox} ${number_prefix}${BOLD}${WHITE}${items[$i]}${NC}"
       else
         # 일반 항목
         if [ ${selection_status[$i]} -eq 1 ]; then
-          echo -e "  ${GREEN}${checkbox}${NC} ${items[$i]}${order_num}"
+          # 선택됨: 초록색 체크박스
+          echo -e "  ${GREEN}${checkbox}${NC} ${number_prefix}${items[$i]}"
         else
-          echo -e "  ${checkbox} ${DIM}${items[$i]}${NC}"
+          # 선택안됨: 흐린 텍스트
+          echo -e "  ${checkbox} ${number_prefix}${items[$i]}"
         fi
       fi
     done
 
     # 하단 안내문
     echo
-    echo -e "${DIM}↑/↓: Move  Space: Select/Deselect  A: Select/Deselect All  Enter: Confirm  Ctrl+C: Exit${NC}"
+    if [ $item_count -le 9 ]; then
+      echo -e "${DIM}↑/↓: Move  1-${item_count}: Quick select  Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
+    else
+      echo -e "${DIM}↑/↓: Move  Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
+    fi
 
     # 키 입력 대기
     IFS= read -rsn1 key
@@ -449,6 +454,24 @@ select_multi_interactive() {
             fi
           done
           selection_order=("${new_order[@]}")
+        fi
+        ;;
+      [1-9]) # 숫자 키 1-9 (9개 이하일 때만)
+        # 10개 이상이면 숫자키 무시
+        if [ $item_count -le 9 ]; then
+          local input_num=$((key))
+          # 유효한 범위 확인
+          if [ $input_num -ge 1 ] && [ $input_num -le $item_count ]; then
+            local selected_idx=$((input_num - 1))
+            # 해당 항목만 선택 상태로 변경
+            for ((i=0; i<item_count; i++)); do
+              selection_status[$i]=0
+            done
+            selection_status[$selected_idx]=1
+            selection_order=("$selected_idx")
+            # 즉시 확정 (Enter와 동일)
+            break
+          fi
         fi
         ;;
     esac
@@ -565,9 +588,6 @@ find_and_select_device() {
 }
 
 present_device_selection() {
-  # 화면 갱신: APK 선택 내용을 지우고 커서를 상단으로 이동
-  clear
-
   # 디바이스 목록을 줄 단위로 분리하여 `device_list` 배열에 저장
   IFS=$'\n' read -rd '' -a device_list <<< "$devices"
   
@@ -607,7 +627,7 @@ pretty_print_apk_files() {
   echo -e "${BARROW} ${BOLD}The APK files to install.${NC}"
   local i=1
   for apk_file in "${apk_files[@]}"; do
-    echo "[${i}] $(basename "$apk_file")"
+    echo "${i}. $(basename "$apk_file")"
     ((i++))
   done
 }
@@ -617,7 +637,7 @@ pretty_print_selected_devices() {
   echo -e "${BARROW} ${BOLD}Selected devices for installation:${NC}"
   local i=1
   for device in "${selected_device[@]}"; do
-    echo "[${i}] $(pretty_device $device)"
+    echo "${i}. $(pretty_device $device)"
     ((i++))
   done
 }
