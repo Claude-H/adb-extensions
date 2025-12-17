@@ -38,7 +38,7 @@ exec zsh
 **자동완성 기능:**
 
 - **ak**: 모든 명령어(pull, info, devices 등), 옵션(--all, --help 등) 자동완성
-- **ai**: 모든 옵션(-l, -a, -p 등), APK 파일(*.apk), 디렉토리 자동완성
+- **ai**: 모든 옵션(-l, -a, -p 등), 현재 폴더의 APK 파일(*.apk) 자동완성
 
 **사용 예시:**
 
@@ -49,7 +49,7 @@ ak activities --<Tab>  # --all 옵션 표시
 
 # ai 옵션 및 파일 자동완성
 ai -<Tab>          # 옵션 목록 표시
-ai <Tab>           # APK 파일 및 디렉토리 목록 표시
+ai <Tab>           # 현재 폴더의 APK 파일 목록 표시
 ```
 
 > **참고:** 현재 zsh만 지원합니다. bash 지원은 향후 추가 예정입니다.
@@ -58,7 +58,7 @@ ai <Tab>           # APK 파일 및 디렉토리 목록 표시
 
 ## 주요 기능
 
-### `ai` - APK 설치 도구 (APK Installer) `v2.8.0`
+### `ai` - APK 설치 도구 (APK Installer) `v2.8.1`
 
 - 최신 APK, 전체 APK, 선택 APK 설치 지원
 - 여러 기기 대상 설치 가능
@@ -83,7 +83,7 @@ ai <Tab>           # APK 파일 및 디렉토리 목록 표시
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.8.0`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.8.1`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행

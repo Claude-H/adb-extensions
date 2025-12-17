@@ -1,5 +1,6 @@
 #!/bin/bash
-
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 # ─────────────────────────────────────────────────────────────────────────────
 # ADB Kit (ak)
 # ADB를 활용하여 안드로이드 디바이스에서 APK 추출, 버전 조회, 권한 확인,
@@ -8,7 +9,7 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.8.0"
+VERSION="1.8.1"
 RELEASE_DATE="2025-12-17"
 
 # 색상 및 스타일 정의
@@ -994,7 +995,7 @@ present_device_selection() {
     done
     
     # 인터랙티브 선택 실행
-    select_single_interactive "📱 Select a device" "${formatted_devices[@]}"
+    select_single_interactive "Select a device" "${formatted_devices[@]}"
     
     # 선택된 인덱스를 사용하여 실제 디바이스 ID 설정
     G_SELECTED_DEVICE="${G_DEVICE_LIST[$SELECTED_INDEX]}"
@@ -1194,8 +1195,8 @@ install_script() {
     echo -e "${GARROW} Zsh completion installed at '${CYAN}${completion_path}${NC}'"
     echo
     echo -e "${YELLOW}To enable tab completion:${NC}"
-    echo -e "  ${DIM}1. Restart your terminal, or${NC}"
-    echo -e "  ${DIM}2. Run: ${BOLD}exec zsh${NC}"
+    echo -e "  1. Restart your terminal, or"
+    echo -e "  2. Run: ${BOLD}exec zsh${NC}"
   else
     echo -e "${ERROR} Failed to install zsh completion."
   fi

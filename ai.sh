@@ -1,5 +1,6 @@
 #!/bin/bash
-
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 # ─────────────────────────────────────────────────────────────────────────────
 # ADB Installer (ai)
 # ADB를 활용하여 안드로이드 디바이스에 APK를 설치할 수 있는 CLI 도구입니다.
@@ -8,7 +9,7 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.8.0"
+VERSION="2.8.1"
 RELEASE_DATE="2025-12-17"
 
 # 색상 및 스타일 정의
@@ -598,7 +599,7 @@ present_device_selection() {
   done
   
   # 인터랙티브 선택 실행
-  select_multi_interactive "📱 Select devices for installation" "${formatted_devices[@]}"
+  select_multi_interactive "Select devices for installation" "${formatted_devices[@]}"
   
   # 선택된 인덱스를 사용하여 실제 디바이스 ID 배열 생성
   selected_device=()
@@ -840,6 +841,9 @@ generate_zsh_completion() {
 #compdef ai
 
 _ai() {
+  local -a apk_files
+  apk_files=(*.apk(N-.))
+
   _arguments -C \
     '(- *)'{-h,--help}'[Show help message]' \
     '(- *)'{-v,--version}'[Show version]' \
@@ -851,7 +855,7 @@ _ai() {
     '-r[Replace existing app]' \
     '-t[Allow test APKs]' \
     '-d[Allow version downgrade]' \
-    '*:APK or directory:_files -g "*.apk" -g "*(-/)"'
+    '*:APK files:compadd -a apk_files'
 }
 
 _ai "$@"
@@ -896,8 +900,8 @@ install_script() {
     echo -e "${GARROW} Zsh completion installed at '${CYAN}${completion_path}${NC}'"
     echo
     echo -e "${YELLOW}To enable tab completion:${NC}"
-    echo -e "  ${DIM}1. Restart your terminal, or${NC}"
-    echo -e "  ${DIM}2. Run: ${BOLD}exec zsh${NC}"
+    echo -e "  1. Restart your terminal, or"
+    echo -e "  2. Run: ${BOLD}exec zsh${NC}"
   else
     echo -e "${ERROR} Failed to install zsh completion."
   fi

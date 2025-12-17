@@ -4,6 +4,24 @@
 
 ## [2025-12-17]
 
+### ADB Kit (ak) v1.8.1
+
+**개선 사항:**
+- UTF-8 인코딩 일관성을 위한 locale 설정 추가 (LANG=C.UTF-8, LC_ALL=C.UTF-8)
+
+### ADB Installer (ai) v2.8.1
+
+**버그 수정:**
+- zsh 자동완성이 APK 파일만 표시하도록 수정
+  - 기존: APK 파일이 있을 때 디렉토리도 함께 표시됨
+  - 기존: APK 파일이 없을 때 모든 파일이 표시됨
+  - 개선: `compadd` 사용으로 현재 폴더의 APK 파일만 정확하게 표시
+
+**개선 사항:**
+- UTF-8 인코딩 일관성을 위한 locale 설정 추가 (LANG=C.UTF-8, LC_ALL=C.UTF-8)
+
+---
+
 ### ADB Kit (ak) v1.8.0
 
 **새로운 기능:**
@@ -27,8 +45,7 @@ ak --<Tab>            # 전역 옵션 표시
 **새로운 기능:**
 - **zsh tab 자동완성 지원 추가**
   - 모든 옵션 자동완성 (-l, -a, -p, -m, -r, -t, -d)
-  - APK 파일(*.apk) 자동완성
-  - 디렉토리 자동완성
+  - 현재 폴더의 APK 파일(*.apk) 자동완성
   - 상호 배타적 옵션 처리 (-l, -a, -p는 동시 사용 불가)
   - `--install` 실행 시 completion 스크립트 자동 설치
   - `/usr/local/share/zsh/site-functions/_ai`에 설치
@@ -37,7 +54,7 @@ ak --<Tab>            # 전역 옵션 표시
 **사용 예시:**
 ```bash
 ai -<Tab>   # 옵션 목록 표시
-ai <Tab>    # APK 파일 및 디렉토리 목록 표시
+ai <Tab>    # 현재 폴더의 APK 파일 목록 표시
 ai --<Tab>  # 전역 옵션 표시
 ```
 
