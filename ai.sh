@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwang
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="2.7.1"
-RELEASE_DATE="2025-12-16"
+VERSION="2.8.0"
+RELEASE_DATE="2025-12-17"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -832,6 +832,32 @@ start_adb_install() {
   adb ${device_opt} install ${install_opt} "${apk_file}" 2>&1
 }
 
+# zsh completion 스크립트를 생성합니다.
+generate_zsh_completion() {
+  local completion_path="$1"
+  
+  cat > "$completion_path" <<'EOF'
+#compdef ai
+
+_ai() {
+  _arguments -C \
+    '(- *)'{-h,--help}'[Show help message]' \
+    '(- *)'{-v,--version}'[Show version]' \
+    '(- *)--install[Install script to /usr/local/bin]' \
+    '(-a -p)-l[Install latest APK]' \
+    '(-l -p)-a[Install all APKs]' \
+    '(-l -a)-p[Filter APKs by pattern]:pattern' \
+    '-m[Install on all devices]' \
+    '-r[Replace existing app]' \
+    '-t[Allow test APKs]' \
+    '-d[Allow version downgrade]' \
+    '*:APK or directory:_files -g "*.apk" -g "*(-/)"'
+}
+
+_ai "$@"
+EOF
+}
+
 # 스크립트를 /usr/local/bin 에 설치하고 실행 권한 및 격리 해제를 수행합니다.
 install_script() {
   local src_path
@@ -840,6 +866,8 @@ install_script() {
   filename="$(basename "$src_path")"
   filename="${filename%.sh}"  # .sh 확장자 제거
   local dest_path="/usr/local/bin/$filename"
+  local completion_dir="/usr/local/share/zsh/site-functions"
+  local completion_path="${completion_dir}/_${filename}"
 
   echo -e "${BARROW} Installing '${YELLOW}${filename}${NC}' to ${CYAN}/usr/local/bin${NC}..."
 
@@ -853,6 +881,26 @@ install_script() {
   xattr -d com.apple.quarantine "$dest_path" 2>/dev/null
 
   echo -e "${GARROW} Installed successfully at '${CYAN}${dest_path}${NC}'"
+
+  # zsh completion 설치
+  echo
+  echo -e "${BARROW} Installing zsh completion..."
+  
+  if [ ! -d "$completion_dir" ]; then
+    mkdir -p "$completion_dir"
+  fi
+  
+  generate_zsh_completion "$completion_path"
+  
+  if [ $? -eq 0 ]; then
+    echo -e "${GARROW} Zsh completion installed at '${CYAN}${completion_path}${NC}'"
+    echo
+    echo -e "${YELLOW}To enable tab completion:${NC}"
+    echo -e "  ${DIM}1. Restart your terminal, or${NC}"
+    echo -e "  ${DIM}2. Run: ${BOLD}exec zsh${NC}"
+  else
+    echo -e "${ERROR} Failed to install zsh completion."
+  fi
 }
 
 main() {

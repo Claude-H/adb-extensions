@@ -8,8 +8,8 @@
 # 🧑‍💻 작성자: Claude Hwnag
 # ─────────────────────────────────────────────────────────────────────────────
 
-VERSION="1.7.0"
-RELEASE_DATE="2025-12-16"
+VERSION="1.8.0"
+RELEASE_DATE="2025-12-17"
 
 # 색상 및 스타일 정의
 RED='\033[1;31m' # 빨간색
@@ -1109,6 +1109,53 @@ process_options() {
 }
 
 
+# zsh completion 스크립트를 생성합니다.
+generate_zsh_completion() {
+  local completion_path="$1"
+  
+  cat > "$completion_path" <<'EOF'
+#compdef ak
+
+_ak() {
+  local -a commands
+  commands=(
+    'pull:Pull APK file from device'
+    'info:Show package information'
+    'permissions:List package permissions'
+    'uninstall:Uninstall package'
+    'clear:Clear app data and cache'
+    'kill:Force-stop package'
+    'devices:Show connected devices'
+    'launch:Launch package'
+    'signature:Extract signature hash'
+    'activities:Show activity stack'
+  )
+  
+  _arguments -C \
+    '(- *)'{-h,--help}'[Show help message]' \
+    '(- *)'{-v,--version}'[Show version]' \
+    '(- *)--install[Install script to /usr/local/bin]' \
+    '1:command:->command' \
+    '*::arg:->args'
+  
+  case $state in
+    command)
+      _describe 'ak commands' commands
+      ;;
+    args)
+      case $words[1] in
+        activities)
+          _arguments '--all[Show all tasks]'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_ak "$@"
+EOF
+}
+
 # 스크립트를 /usr/local/bin 에 설치하고 실행 권한 및 격리 해제를 수행합니다.
 install_script() {
   local src_path
@@ -1117,6 +1164,8 @@ install_script() {
   filename="$(basename "$src_path")"
   filename="${filename%.sh}"  # .sh 확장자 제거
   local dest_path="/usr/local/bin/$filename"
+  local completion_dir="/usr/local/share/zsh/site-functions"
+  local completion_path="${completion_dir}/_${filename}"
 
   echo -e "${BARROW} Installing '${YELLOW}${filename}${NC}' to ${CYAN}/usr/local/bin${NC}..."
 
@@ -1130,6 +1179,26 @@ install_script() {
   xattr -d com.apple.quarantine "$dest_path" 2>/dev/null
 
   echo -e "${GARROW} Installed successfully at '${CYAN}${dest_path}${NC}'"
+
+  # zsh completion 설치
+  echo
+  echo -e "${BARROW} Installing zsh completion..."
+  
+  if [ ! -d "$completion_dir" ]; then
+    mkdir -p "$completion_dir"
+  fi
+  
+  generate_zsh_completion "$completion_path"
+  
+  if [ $? -eq 0 ]; then
+    echo -e "${GARROW} Zsh completion installed at '${CYAN}${completion_path}${NC}'"
+    echo
+    echo -e "${YELLOW}To enable tab completion:${NC}"
+    echo -e "  ${DIM}1. Restart your terminal, or${NC}"
+    echo -e "  ${DIM}2. Run: ${BOLD}exec zsh${NC}"
+  else
+    echo -e "${ERROR} Failed to install zsh completion."
+  fi
 }
 
 main() {

@@ -2,6 +2,50 @@
 
 모든 주요 변경 사항이 이 파일에 기록됩니다.
 
+## [2025-12-17]
+
+### ADB Kit (ak) v1.8.0
+
+**새로운 기능:**
+- **zsh tab 자동완성 지원 추가**
+  - 모든 명령어 자동완성 (pull, info, permissions, uninstall, clear, kill, devices, launch, signature, activities)
+  - 명령어별 옵션 자동완성 (activities --all)
+  - 전역 옵션 자동완성 (--install, --version, --help)
+  - `--install` 실행 시 completion 스크립트 자동 설치
+  - `/usr/local/share/zsh/site-functions/_ak`에 설치
+  - 터미널 재시작 또는 `exec zsh` 실행으로 활성화
+
+**사용 예시:**
+```bash
+ak <Tab>              # 명령어 목록 표시
+ak activities --<Tab> # --all 옵션 표시
+ak --<Tab>            # 전역 옵션 표시
+```
+
+### ADB Installer (ai) v2.8.0
+
+**새로운 기능:**
+- **zsh tab 자동완성 지원 추가**
+  - 모든 옵션 자동완성 (-l, -a, -p, -m, -r, -t, -d)
+  - APK 파일(*.apk) 자동완성
+  - 디렉토리 자동완성
+  - 상호 배타적 옵션 처리 (-l, -a, -p는 동시 사용 불가)
+  - `--install` 실행 시 completion 스크립트 자동 설치
+  - `/usr/local/share/zsh/site-functions/_ai`에 설치
+  - 터미널 재시작 또는 `exec zsh` 실행으로 활성화
+
+**사용 예시:**
+```bash
+ai -<Tab>   # 옵션 목록 표시
+ai <Tab>    # APK 파일 및 디렉토리 목록 표시
+ai --<Tab>  # 전역 옵션 표시
+```
+
+**공통:**
+- zsh 전용 지원 (bash는 향후 추가 예정)
+- macOS 및 Linux 지원
+- 설치 후 즉시 사용 가능
+
 ## [2025-12-16]
 
 ### ADB Installer (ai) v2.7.1

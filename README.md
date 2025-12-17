@@ -19,11 +19,46 @@ sudo ./ak.sh --install
 
 > 만약 실행 권한 문제가 있거나 macOS에서 다운로드한 스크립트가 격리되어 실행되지 않을 경우, `--install` 옵션을 이용하면 자동으로 해결됩니다.
 
+### zsh Tab 자동완성
+
+`--install` 옵션으로 설치하면 **zsh tab 자동완성**도 함께 설치됩니다.
+
+**설치 위치:**
+- `ak`: `/usr/local/share/zsh/site-functions/_ak`
+- `ai`: `/usr/local/share/zsh/site-functions/_ai`
+
+**활성화 방법:**
+
+설치 후 터미널을 재시작하거나 다음 명령어를 실행하세요:
+
+```bash
+exec zsh
+```
+
+**자동완성 기능:**
+
+- **ak**: 모든 명령어(pull, info, devices 등), 옵션(--all, --help 등) 자동완성
+- **ai**: 모든 옵션(-l, -a, -p 등), APK 파일(*.apk), 디렉토리 자동완성
+
+**사용 예시:**
+
+```bash
+# ak 명령어 자동완성
+ak <Tab>           # 명령어 목록 표시
+ak activities --<Tab>  # --all 옵션 표시
+
+# ai 옵션 및 파일 자동완성
+ai -<Tab>          # 옵션 목록 표시
+ai <Tab>           # APK 파일 및 디렉토리 목록 표시
+```
+
+> **참고:** 현재 zsh만 지원합니다. bash 지원은 향후 추가 예정입니다.
+
 ---
 
 ## 주요 기능
 
-### `ai` - APK 설치 도구 (APK Installer) `v2.7.1`
+### `ai` - APK 설치 도구 (APK Installer) `v2.8.0`
 
 - 최신 APK, 전체 APK, 선택 APK 설치 지원
 - 여러 기기 대상 설치 가능
@@ -48,7 +83,7 @@ sudo ./ak.sh --install
   - 옵션 없이 APK 파일 경로를 직접 지정하여 설치
   - 예: `ai app1.apk app2.apk`
 
-### `ak` - APK 관리 도구 (APK Toolkit) `v1.7.0`
+### `ak` - APK 관리 도구 (APK Toolkit) `v1.8.0`
 
 - APK 추출, 정보 조회, 권한 목록 확인
 - 앱 제거, 데이터 삭제, 강제 종료, 실행
