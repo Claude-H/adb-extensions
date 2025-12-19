@@ -2,7 +2,7 @@ class AdbExtensionsKit < Formula
   desc "ADB extensions kit - Essential ADB utilities for Android development"
   homepage "https://github.com/luminousvault/adb-extensions"
   url "https://github.com/luminousvault/adb-extensions/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "REPLACE_WITH_ACTUAL_SHA256"
+  sha256 "878ec096dbd8569f2dd37c6b7cac10cabfc94d81ab55f8c093c6fc03af37d4bc"
   license "MIT"
   version "1.0.0"
 
