@@ -115,7 +115,7 @@ jobs:
           echo "::endgroup::"
           # #endregion
           
-          tar -czf /tmp/adb-extensions-v${VERSION}.tar.gz \
+          tar -czpf /tmp/adb-extensions-v${VERSION}.tar.gz \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='.gitignore' \
