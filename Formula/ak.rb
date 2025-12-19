@@ -14,6 +14,12 @@ class Ak < Formula
     # Completion 설치
     zsh_completion.install "build/completions/_ak"
   end
+  
+  def caveats
+    <<~EOS
+        ⚠️ IMPORTANT: To enable tab completion, restart your terminal
+    EOS
+  end
 
   test do
     # 버전 체크
