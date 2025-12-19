@@ -69,7 +69,6 @@ adb-extensions/
 │
 ├── build/                     # Build output (generated)
 │   ├── ak                     # Merged shell script
-│   ├── ak.bin                 # Binary executable (optional)
 │   └── completions/
 │
 ├── build.sh                   # Build system
@@ -125,12 +124,12 @@ git push origin feature/your-feature-name
 
 ## Build System
 
-The build system merges all modular source files into a single distributable script and optionally compiles it to a binary.
+The build system merges all modular source files into a single distributable script.
 
 ### Build Commands
 
 ```bash
-# Build shell script + binary
+# Build shell script
 ./build.sh
 
 # Install locally (requires sudo)
@@ -149,7 +148,6 @@ sudo ./build.sh --uninstall
 ### Build Output
 
 - `build/ak` - Merged shell script (portable, ready to distribute)
-- `build/ak.bin` - Binary executable (requires shc, optional)
 - `build/completions/_ak` - Zsh completion file
 
 ### Module System

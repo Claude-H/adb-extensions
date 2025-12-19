@@ -23,9 +23,9 @@ NC='\033[0m'
 
 install_local() {
   # 1. 빌드 파일 존재 확인
-  if [ ! -f "${BUILD_DIR}/ak.bin" ] && [ ! -f "${BUILD_DIR}/ak" ]; then
+  if [ ! -f "${BUILD_DIR}/ak" ]; then
     echo
-    echo -e "${RED}ERROR: Build files not found.${NC}"
+    echo -e "${RED}ERROR: Build file not found.${NC}"
     echo -e "${YELLOW}Please run './build.sh' first to build the project.${NC}"
     echo
     exit 1
@@ -33,7 +33,7 @@ install_local() {
   
   echo
   echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
-  echo -e "${GREEN}Installing ADB extensions kit (ak) - Binary${NC}"
+  echo -e "${GREEN}Installing ADB extensions kit (ak)${NC}"
   echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
   echo
   echo -e "${CYAN}==> Installing from build directory...${NC}"
@@ -44,19 +44,11 @@ install_local() {
     exit 1
   fi
   
-  # 3. 바이너리 우선 설치 (확장자 제거)
-  if [ -f "${BUILD_DIR}/ak.bin" ]; then
-    cp "${BUILD_DIR}/ak.bin" /usr/local/bin/ak
-    chmod +x /usr/local/bin/ak
-    xattr -d com.apple.quarantine /usr/local/bin/ak 2>/dev/null || true
-    echo -e "${GREEN}✓ Installed binary: /usr/local/bin/ak${NC}"
-  else
-    # Fallback: 쉘 스크립트 설치
-    cp "${BUILD_DIR}/ak" /usr/local/bin/ak
-    chmod +x /usr/local/bin/ak
-    xattr -d com.apple.quarantine /usr/local/bin/ak 2>/dev/null || true
-    echo -e "${GREEN}✓ Installed shell script: /usr/local/bin/ak${NC}"
-  fi
+  # 3. 쉘 스크립트 설치
+  cp "${BUILD_DIR}/ak" /usr/local/bin/ak
+  chmod +x /usr/local/bin/ak
+  xattr -d com.apple.quarantine /usr/local/bin/ak 2>/dev/null || true
+  echo -e "${GREEN}✓ Installed: /usr/local/bin/ak${NC}"
   
   # 4. Completion 설치
   if [ -f "${BUILD_DIR}/completions/_ak" ]; then
@@ -71,7 +63,7 @@ install_local() {
   echo -e "${GREEN}═══════════════════════════════════════════════════${NC}"
   echo
   echo -e "${YELLOW}Note: Using build files from '${BUILD_DIR}/'${NC}"
-  echo -e "${YELLOW}This is the same as Homebrew installation (binary).${NC}"
+  echo -e "${YELLOW}This is the same as Homebrew installation.${NC}"
   echo
   echo -e "${YELLOW}To enable tab completion:${NC}"
   echo -e "  1. Restart your terminal, or"
@@ -404,32 +396,6 @@ EOF
   echo -e "${DIM}  (자동 생성: heredoc 블록 추출 → 조립)${NC}"
 }
 
-# shc로 바이너리 빌드 (선택사항)
-build_binary() {
-  if ! command -v shc &> /dev/null; then
-    echo -e "${RED}✗ shc not found. Binary build is required.${NC}"
-    echo -e "${YELLOW}  To build binary, install shc: brew install shc${NC}"
-    return 1
-  fi
-  
-  echo -e "${CYAN}==> Building binary with shc...${NC}"
-  
-  # shc로 바이너리 생성
-  shc -f "${BUILD_DIR}/ak" -o "${BUILD_DIR}/ak.bin"
-  
-  if [ -f "${BUILD_DIR}/ak.bin" ]; then
-    chmod +x "${BUILD_DIR}/ak.bin"
-    
-    # 생성된 .c 파일 삭제 (불필요)
-    rm -f "${BUILD_DIR}/ak.x.c"
-    
-    local size=$(du -h "${BUILD_DIR}/ak.bin" | cut -f1)
-    echo -e "${GREEN}✓ Created binary: ${BUILD_DIR}/ak.bin (${size})${NC}"
-  else
-    echo -e "${RED}✗ Failed to create binary${NC}"
-    return 1
-  fi
-}
 
 # 빌드 검증
 verify_build() {
@@ -464,11 +430,6 @@ show_summary() {
     local lines=$(wc -l < "${BUILD_DIR}/ak")
     local size=$(du -h "${BUILD_DIR}/ak" | cut -f1)
     echo -e "  Shell Script: ${CYAN}${BUILD_DIR}/ak${NC} ($lines lines, $size)"
-  fi
-  
-  if [ -f "${BUILD_DIR}/ak.bin" ]; then
-    local size=$(du -h "${BUILD_DIR}/ak.bin" | cut -f1)
-    echo -e "  Binary:       ${CYAN}${BUILD_DIR}/ak.bin${NC} ($size)"
   fi
   
   if [ -f "${BUILD_DIR}/completions/_ak" ]; then
@@ -522,14 +483,13 @@ main() {
     echo -e "  into a single distributable script or installs for local development."
     echo
     echo -e "${BOLD}Options:${NC}"
-    echo -e "  ${GREEN}(none)${NC}              Build shell script + binary (default)"
-    echo -e "                      ${DIM}→ Creates build/ak and build/ak.bin${NC}"
-    echo -e "                      ${DIM}→ Requires: shc (install via 'brew install shc')${NC}"
+    echo -e "  ${GREEN}(none)${NC}              Build shell script (default)"
+    echo -e "                      ${DIM}→ Creates build/ak${NC}"
     echo
-    echo -e "  ${GREEN}--install, -i${NC}       Install built binary (requires sudo)"
+    echo -e "  ${GREEN}--install, -i${NC}       Install built script (requires sudo)"
     echo -e "                      ${DIM}→ Uses existing build files from build/ directory${NC}"
     echo -e "                      ${DIM}→ Run './build.sh' first if not built yet${NC}"
-    echo -e "                      ${DIM}→ Installs: /usr/local/bin/ak (binary)${NC}"
+    echo -e "                      ${DIM}→ Installs: /usr/local/bin/ak${NC}"
     echo -e "                      ${DIM}→ Same as Homebrew installation${NC}"
     echo
     echo -e "  ${GREEN}--uninstall, -u${NC}     Uninstall local installation (requires sudo)"
@@ -551,7 +511,6 @@ main() {
     echo
     echo -e "${BOLD}Build Output:${NC}"
     echo -e "  ${CYAN}build/ak${NC}               Merged shell script"
-    echo -e "  ${CYAN}build/ak.bin${NC}            Binary executable (shc required)"
     echo -e "  ${CYAN}build/completions/_ak${NC}   Zsh completion file"
     echo
     echo -e "${BOLD}Source Structure:${NC}"
@@ -565,7 +524,7 @@ main() {
     echo -e "  ${DIM}1.${NC} Edit source files in ${CYAN}src/${NC}"
     echo -e "  ${DIM}2.${NC} Test with ${YELLOW}./src/ak${NC} (no build needed)"
     echo -e "  ${DIM}3.${NC} Build with ${YELLOW}./build.sh${NC}"
-    echo -e "  ${DIM}4.${NC} Test build with ${YELLOW}./build/ak${NC} or ${YELLOW}./build/ak.bin${NC}"
+    echo -e "  ${DIM}4.${NC} Test build with ${YELLOW}./build/ak${NC}"
     echo -e "  ${DIM}5.${NC} Install for testing ${YELLOW}sudo ./build.sh --install${NC}"
     echo -e "  ${DIM}6.${NC} Commit changes"
     echo
