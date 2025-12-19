@@ -27,8 +27,14 @@ A unified CLI tool that simplifies Android Debug Bridge (ADB) operations includi
 ### Homebrew (Recommended)
 
 ```bash
-brew tap luminousvault/ak
+brew tap luminousvault/adb-extensions
 brew install ak
+```
+
+Or install directly without tap:
+
+```bash
+brew install https://raw.githubusercontent.com/luminousvault/adb-extensions/main/Formula/ak.rb
 ```
 
 ### From Source

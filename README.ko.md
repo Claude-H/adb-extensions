@@ -27,8 +27,14 @@ APK 관리, 디바이스 제어, 앱 검사 등 Android Debug Bridge(ADB) 작업
 ### Homebrew (권장)
 
 ```bash
-brew tap luminousvault/ak
+brew tap luminousvault/adb-extensions
 brew install ak
+```
+
+또는 tap 없이 직접 설치:
+
+```bash
+brew install https://raw.githubusercontent.com/luminousvault/adb-extensions/main/Formula/ak.rb
 ```
 
 ### 소스에서 설치
