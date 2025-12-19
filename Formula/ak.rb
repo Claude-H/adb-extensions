@@ -12,7 +12,7 @@ class Ak < Formula
     # 빌드된 단일 파일 설치
     bin.install "build/ak.bin" => "ak"
     # 표준 실행 파일
-    chmod 0755, bin/"ak"
+    File.chmod(0755, bin/"ak")
     # Completion 설치
     zsh_completion.install "build/completions/_ak"
   end
