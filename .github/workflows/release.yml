@@ -118,7 +118,6 @@ jobs:
           tar -czf /tmp/adb-extensions-v${VERSION}.tar.gz \
             --exclude='.git' \
             --exclude='.github' \
-            --exclude='build' \
             --exclude='.gitignore' \
             --exclude='.cursor' \
             --exclude='*.tar.gz' \

@@ -9,9 +9,6 @@ class Ak < Formula
   # depends_on "android-platform-tools"  # adb 의존성
 
   def install
-    # 빌드 실행
-    system "./build.sh"
-    
     # 빌드된 단일 파일 설치
     bin.install "build/ak.bin" => "ak"
     
