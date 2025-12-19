@@ -616,7 +616,7 @@ main() {
   prepare_build_dir
   merge_modules
   generate_completion
-  build_binary  # 항상 바이너리 빌드 (shc 없으면 경고)
+  # build_binary 제거 - 쉘 스크립트만 배포
   verify_build
   show_summary
 }

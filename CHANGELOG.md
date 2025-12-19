@@ -2,6 +2,23 @@
 
 모든 주요 변경 사항이 이 파일에 기록됩니다.
 
+## [1.0.2] - 2025-12-19
+
+### Changed
+- Switched from shc binary to shell script distribution for cross-platform compatibility
+- Removed shc dependency from build process
+- Supports all Unix-like systems (macOS, Linux, WSL) with single distribution
+
+### Fixed
+- Resolved file permission issues during Homebrew installation
+- Fixed platform-specific binary execution errors
+
+## [1.0.1] - 2025-12-19
+
+### Fixed
+- Homebrew installation failure due to missing build artifacts
+- Included prebuilt files in release archive
+
 ## [1.0.0]
 
 ### 첫 공개 릴리스
