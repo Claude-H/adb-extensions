@@ -1,0 +1,189 @@
+name: Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '릴리즈 버전 (예: 1.0.0, v 접두사 제외)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+
+          # Validate semantic version format (x.y.z)
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: Invalid version format '$VERSION'. Expected format: x.y.z (e.g., 1.0.0)"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Validated version: $VERSION"
+
+      - name: Verify VERSION file matches input
+        run: |
+          FILE_VERSION=$(cat src/VERSION)
+          INPUT_VERSION="${{ steps.version.outputs.version }}"
+
+          if [ "$FILE_VERSION" != "$INPUT_VERSION" ]; then
+            echo "Error: VERSION file ($FILE_VERSION) does not match input version ($INPUT_VERSION)"
+            echo "Please update src/VERSION to $INPUT_VERSION before running this workflow"
+            exit 1
+          fi
+
+          echo "Version verified: $INPUT_VERSION"
+
+      - name: Check if tag already exists
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Error: Tag v$VERSION already exists"
+            echo "Please use a different version number or delete the existing tag first"
+            exit 1
+          fi
+
+          echo "Tag v$VERSION does not exist - proceeding with release"
+      
+      - name: Install shc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shc
+      
+      - name: Run build
+        run: |
+          chmod +x build.sh
+          ./build.sh
+      
+      - name: Verify build
+        run: |
+          if [ ! -f "build/ak.bin" ]; then
+            echo "Error: build/ak.bin not found"
+            exit 1
+          fi
+          if [ ! -f "build/completions/_ak" ]; then
+            echo "Error: build/completions/_ak not found"
+            exit 1
+          fi
+      
+      - name: Create source archive
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          tar -czf adb-extensions-v${VERSION}.tar.gz \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='build' \
+            --exclude='.gitignore' \
+            .
+      
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256=$(shasum -a 256 adb-extensions-v${VERSION}.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "SHA256: $SHA256"
+      
+      - name: Update Homebrew Formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.sha256.outputs.sha256 }}"
+
+          # Update Formula file
+          sed -i "s|url \".*\"|url \"https://github.com/luminousvault/adb-extensions/archive/refs/tags/v${VERSION}.tar.gz\"|g" Formula/ak.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|g" Formula/ak.rb
+          sed -i "s|version \".*\"|version \"${VERSION}\"|g" Formula/ak.rb
+
+          echo "Updated Formula/ak.rb:"
+          cat Formula/ak.rb
+
+      - name: Commit Formula updates
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add Formula/ak.rb
+
+          # Commit the Formula update
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(release): update Homebrew Formula for v${VERSION}"
+            git push origin HEAD:main
+            echo "Formula updated and committed to main branch"
+          fi
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Create annotated tag
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+
+          # Push tag to remote
+          git push origin "v${VERSION}"
+
+          echo "Tag v${VERSION} created and pushed"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## ADB Extensions Kit (ak) v${{ steps.version.outputs.version }}
+
+            ### Installation
+
+            ```bash
+            brew tap luminousvault/adb-extensions
+            brew install ak
+            ```
+
+            Or install directly:
+
+            ```bash
+            brew install https://raw.githubusercontent.com/luminousvault/adb-extensions/main/Formula/ak.rb
+            ```
+
+            ### Changes
+
+            See [CHANGELOG.md](https://github.com/luminousvault/adb-extensions/blob/main/CHANGELOG.md) for details.
+          files: |
+            adb-extensions-v${{ steps.version.outputs.version }}.tar.gz
+          draft: false
+          prerelease: false
+      
+      - name: Build summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SHA256:** ${{ steps.sha256.outputs.sha256 }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Archive:** adb-extensions-v${VERSION}.tar.gz" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "brew tap luminousvault/adb-extensions" >> $GITHUB_STEP_SUMMARY
+          echo "brew install ak" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
