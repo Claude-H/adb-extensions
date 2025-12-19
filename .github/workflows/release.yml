@@ -75,8 +75,8 @@ jobs:
       
       - name: Verify build
         run: |
-          if [ ! -f "build/ak.bin" ]; then
-            echo "Error: build/ak.bin not found"
+          if [ ! -f "build/ak" ]; then
+            echo "Error: build/ak not found"
             exit 1
           fi
           if [ ! -f "build/completions/_ak" ]; then
