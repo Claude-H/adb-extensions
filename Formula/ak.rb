@@ -1,4 +1,4 @@
-class AdbExtensionsKit < Formula
+class Ak < Formula
   desc "ADB extensions kit - Essential ADB utilities for Android development"
   homepage "https://github.com/luminousvault/adb-extensions"
   url "https://github.com/luminousvault/adb-extensions/archive/refs/tags/v1.0.0.tar.gz"
