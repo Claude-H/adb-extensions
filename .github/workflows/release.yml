@@ -87,12 +87,52 @@ jobs:
       - name: Create source archive
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          tar -czf adb-extensions-v${VERSION}.tar.gz \
+          
+          # #region agent log
+          # Hypothesis A, B, C, E: Log directory state before tar
+          echo "::group::Debug - Directory state before tar"
+          echo "PWD: $(pwd)"
+          echo "Total files: $(ls -la | wc -l)"
+          ls -la
+          echo "::endgroup::"
+          
+          # List all files that will be included (excluding patterns)
+          echo "::group::Debug - Files to be archived"
+          find . -type f \
+            ! -path './.git/*' \
+            ! -path './.github/*' \
+            ! -path './build/*' \
+            ! -name '.gitignore' \
+            ! -name 'adb-extensions-*.tar.gz' | head -20
+          echo "Total files to archive: $(find . -type f ! -path './.git/*' ! -path './.github/*' ! -path './build/*' ! -name '.gitignore' ! -name 'adb-extensions-*.tar.gz' | wc -l)"
+          echo "::endgroup::"
+          # #endregion
+          
+          # #region agent log
+          # Hypothesis A: Exclude the tar.gz file explicitly and create in /tmp first
+          echo "::group::Debug - Creating tar archive"
+          echo "Output file: /tmp/adb-extensions-v${VERSION}.tar.gz"
+          echo "::endgroup::"
+          # #endregion
+          
+          tar -czf /tmp/adb-extensions-v${VERSION}.tar.gz \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='build' \
             --exclude='.gitignore' \
+            --exclude='.cursor' \
+            --exclude='*.tar.gz' \
             .
+          
+          # #region agent log
+          # Hypothesis A: Move to current directory after creation
+          mv /tmp/adb-extensions-v${VERSION}.tar.gz .
+          echo "::group::Debug - Tar archive created"
+          echo "Size: $(du -h adb-extensions-v${VERSION}.tar.gz | cut -f1)"
+          echo "Location: $(pwd)/adb-extensions-v${VERSION}.tar.gz"
+          ls -lh adb-extensions-v${VERSION}.tar.gz
+          echo "::endgroup::"
+          # #endregion
       
       - name: Calculate SHA256
         id: sha256
@@ -118,6 +158,8 @@ jobs:
       - name: Commit Formula updates
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          CURRENT_BRANCH="${{ github.ref_name }}"
+          
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
           git add Formula/ak.rb
@@ -127,8 +169,12 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(release): update Homebrew Formula for v${VERSION}"
-            git push origin HEAD:main
-            echo "Formula updated and committed to main branch"
+            git push origin HEAD:${CURRENT_BRANCH}
+            echo "Formula updated and committed to ${CURRENT_BRANCH} branch"
+            
+            if [ "${CURRENT_BRANCH}" != "main" ]; then
+              echo "::warning::Running on branch '${CURRENT_BRANCH}'. Remember to create a PR to merge into main."
+            fi
           fi
 
       - name: Create and push tag
