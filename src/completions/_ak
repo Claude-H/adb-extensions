@@ -1,0 +1,88 @@
+#compdef ak
+
+_ak() {
+  local -a commands
+  commands=(
+    'install:Install APK files'
+    'pull:Pull APK file from device'
+    'info:Show package information'
+    'permissions:List package permissions'
+    'uninstall:Uninstall package'
+    'clear:Clear app data and cache'
+    'kill:Force-stop package'
+    'launch:Launch package'
+    'signature:Extract signature hash'
+    'activities:Show activity stack'
+    'devices:Show connected devices'
+  )
+  
+  _arguments -C \
+    '(- *)'{-h,--help}'[Show help message]' \
+    '(- *)'{-v,--version}'[Show version]' \
+    '1:command:->command' \
+    '*::arg:->args'
+  
+  case $state in
+    command)
+      _describe 'ak commands' commands
+      ;;
+    args)
+      case $words[1] in
+        install)
+          local -a apk_files
+          apk_files=(*.apk(N-.))
+          _arguments -C \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '(-a -p)-l[Install latest APK]' \
+            '(-l -p)-a[Install all APKs]' \
+            '(-l -a)-p[Filter APKs by pattern]:pattern' \
+            '-m[Install on all devices]' \
+            '-r[Replace existing app]' \
+            '-t[Allow test APKs]' \
+            '-d[Allow version downgrade]' \
+            '*:APK files:compadd -a apk_files'
+          ;;
+        activities)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '(-a --all)'{-a,--all}'[Show all tasks]'
+          ;;
+        clear|kill)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '*:package name:_message "package name"'
+          ;;
+        info|permissions|uninstall)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name:_message "package name"'
+          ;;
+        pull)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name:_message "package name"' \
+            '2:save file name:_files'
+          ;;
+        launch)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name:_message "package name"'
+          ;;
+        signature)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name or APK file:_files -g "*.apk"'
+          ;;
+        devices)
+          _arguments '(- *)'{-h,--help}'[Show help for this command]'
+          ;;
+        *)
+          # 알 수 없는 커맨드는 --help 옵션만 제공
+          _arguments '(- *)'{-h,--help}'[Show help for this command]'
+          ;;
+      esac
+      ;;
+  esac
+}
+
+_ak "$@"

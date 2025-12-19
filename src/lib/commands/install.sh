@@ -1,70 +1,41 @@
 #!/bin/bash
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-# ─────────────────────────────────────────────────────────────────────────────
-# ADB Installer (ai)
-# ADB를 활용하여 안드로이드 디바이스에 APK를 설치할 수 있는 CLI 도구입니다.
-#    여러 디바이스 선택, APK 탐색, 설치 옵션 등을 지원합니다.
-#
-# 🧑‍💻 작성자: Claude Hwang
-# ─────────────────────────────────────────────────────────────────────────────
+#@@BUILD_EXCLUDE_START
+# ═══════════════════════════════════════════════════
+# Install Command
+# APK 설치 커맨드 (ai.sh의 핵심 기능)
+# ═══════════════════════════════════════════════════
+#@@BUILD_EXCLUDE_END
 
-VERSION="2.8.1"
-RELEASE_DATE="2025-12-17"
+# Completion definition: command name and description
+: <<'AK_COMPLETION_DESC'
+install:Install APK files
+AK_COMPLETION_DESC
 
-# 색상 및 스타일 정의
-RED='\033[1;31m' # 빨간색
-GREEN='\033[1;32m' # 초록색
-YELLOW='\033[1;33m' # 노란색
-BLUE='\033[1;34m' # 파란색
-PURPLE='\033[1;35m' # 보라색
-CYAN='\033[1;36m' # 볼드와 옥색
-BOLD='\033[1m' # 볼드
-DIM='\033[2m' # 흐리게
-NC='\033[0m' # 색상 없음
+# Completion handler: zsh completion code for install command
+: <<'AK_COMPLETION'
+        install)
+          local -a apk_files
+          apk_files=(*.apk(N-.))
+          _arguments -C \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '(-a -p)-l[Install latest APK]' \
+            '(-l -p)-a[Install all APKs]' \
+            '(-l -a)-p[Filter APKs by pattern]:pattern' \
+            '-m[Install on all devices]' \
+            '-r[Replace existing app]' \
+            '-t[Allow test APKs]' \
+            '-d[Allow version downgrade]' \
+            '*:APK files:compadd -a apk_files'
+          ;;
+AK_COMPLETION
 
-BARROW="${BLUE}==>${NC}"
-GARROW="${GREEN}==>${NC}"
-ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
-
-show_version() {
-  local script_name=$(basename "$0")
-  local os_info=$(uname -s)
-  local shell_info=$(basename "$SHELL")
-  local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
-  local uptime_info=$(uptime | awk -F'up ' '{print $2}' | awk -F',' '{print $1}' | xargs)
-  
-  echo
-  
-  echo -e "        ${GREEN}::${NC}                   ${GREEN}.::${NC}        ${BOLD}${script_name}${NC} ${GREEN}${VERSION}${NC} - Released on ${RELEASE_DATE}"
-  echo -e "       ${GREEN}:#*+.${NC}                ${GREEN}:+*#.${NC}       ------------------------------------"
-  echo -e "        ${GREEN}:**+:${NC}    ${GREEN}......${NC}    ${GREEN}-+**.${NC}        ${BOLD}${YELLOW}ADB Version:${NC} ${adb_version}"
-  echo -e "         ${GREEN}.*+=---::::::::---+*+${NC}          ${BOLD}${YELLOW}Author:${NC} Claude Hwang"
-  echo -e "        ${YELLOW}:-=----:--------:---==-.${NC}        ${BOLD}${YELLOW}License:${NC} MIT"
-  echo -e "      ${YELLOW}:++=---==============---=+=.${NC}      ${BOLD}${YELLOW}Language:${NC} Bash"
-  echo -e "    ${RED}.+*+=+*%#++++++++++++++##+=+**-${NC}     ${BOLD}${YELLOW}Supported OS:${NC} macOS, Linux"
-  echo -e "   ${RED}.****+%@@%+++++++++++++*@@@#+**#+${NC}    ${BOLD}${YELLOW}Dependencies:${NC} adb"
-  echo -e "   ${CYAN}*#*****#*+++++++++++++++*##*****#=${NC}   ${BOLD}${YELLOW}Repository:${NC} https://github.com/Claude-H/adb-extensions"
-  echo -e "  ${BLUE}-%#*****++++++++++++++++++++****##%.${NC}  "
-  echo -e "                                        ${BOLD}${YELLOW}Purpose:${NC} APK installation tool"
-  echo -e "                                        ${BOLD}${YELLOW}Features:${NC} Multi-device, Interactive selection"
-  echo
-}
-
-# 스크립트 설명과 사용법
-show_help() {
-  echo -e "${BOLD}Usage:${NC} $0 [options] [apk_files...]"
-  echo "This script installs APK files on a selected Android device using adb."
-  echo
-  echo -e "${BOLD}Script Version:${NC}"
-  echo -e "  Current Version: $VERSION"
+# install 커맨드 도움말
+show_help_install() {
+  echo -e "${BOLD}Usage:${NC} ak install [options] [apk_files...]"
+  echo "Install APK files on a selected Android device using adb."
   echo
   echo -e "${BOLD}General Options:${NC}"
-  echo -e "  -v --version\tDisplay the current version of script."
-  echo -e "  -h --help\tShow this help message and exit."
-  echo -e "  --install\tInstall this script to '/usr/local/bin' with executable permission."
-  echo -e "\t\tAlso removes macOS quarantine attributes using xattr."
-  echo -e "\t\tRecommended usage: ${BOLD}sudo ./ai.sh --install${NC}"
+  echo -e "  -h\t\tShow this help message and exit."
   echo
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"
   echo -e "  (none)\t\tSelect APK files interactively from the current directory (default)."
@@ -92,33 +63,27 @@ show_help() {
   echo -e "  the install command to ensure compatibility."
 }
 
-initialize_variables() {
+# 변수 초기화
+initialize_install_variables() {
   install_opt="-r"
   opt_l_used=0
   opt_a_used=0
   opt_m_used=0
   opt_p_used=0
-  filter_pattern=""  # 필터 패턴을 저장할 변수 추가
+  filter_pattern=""
 }
 
-process_options() {
-  while getopts ":vhlamprtd-:" opt; do
+# 옵션 파싱
+process_install_options() {
+  while getopts ":hlamprtd" opt; do
     case ${opt} in
-      h ) show_help; exit 0 ;;
-      v ) show_version; exit 0 ;;
+      h ) show_help_install; exit 0 ;;
       l ) opt_l_used=1 ;;
       a ) opt_a_used=1 ;;
       m ) opt_m_used=1 ;;
       p ) opt_p_used=1 ;;
       t | d ) install_opt+=" -$opt" ;;
       r ) ;; # '-r' 옵션은 이미 기본값으로 설정되어 있으므로 무시
-      - ) case "${OPTARG}" in
-            version ) show_version; exit 0 ;;
-            help ) show_help; exit 0 ;;
-            install ) install_script; exit 0 ;;
-            * ) echo "Invalid option: --${OPTARG}" 1>&2; exit 1 ;;
-          esac
-        ;;
       \? ) echo "Invalid option: $OPTARG" 1>&2; exit 1 ;;
     esac
   done
@@ -129,20 +94,20 @@ process_options() {
     if [ -z "$filter_pattern" ]; then
       echo -e "${ERROR} Option -p requires a pattern argument."
       echo
-      echo -e "${BOLD}Usage:${NC} ai -p <pattern> [directory]"
+      echo -e "${BOLD}Usage:${NC} ak install -p <pattern> [directory]"
       echo -e "${BOLD}Example:${NC}"
-      echo -e "  ai -p debug"
-      echo -e "  ai -p \"myapp release\""
-      echo -e "  ai -p debug /path/to/folder"
+      echo -e "  ak install -p debug"
+      echo -e "  ak install -p \"myapp release\""
+      echo -e "  ak install -p debug /path/to/folder"
       echo
-      echo "For interactive selection of all APKs, use: ai"
+      echo "For interactive selection of all APKs, use: ak install"
       exit 1
     fi
     ((OPTIND++))
   fi
 }
 
-# 옵션 조합을 처리하는 함수
+# 옵션 조합 검증
 handle_option_combinations() {
   # '-l', '-a', '-p' 옵션 사용 여부 확인
   if [ $opt_l_used -eq 1 ] && [ $opt_a_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
@@ -165,11 +130,11 @@ handle_option_combinations() {
     exit 1
   fi
 
-  validate_apk_files "$@"
+  validate_install_apk_files "$@"
 }
 
-# APK 파일이 아닌지, APK 파일인데 다른 옵션과 같이 사용되었는지 판단한다.
-validate_apk_files() {
+# APK 파일이 아닌지, APK 파일인데 다른 옵션과 같이 사용되었는지 판단
+validate_install_apk_files() {
   for arg in "$@"; do
     # 파일 존재 여부
     if [ -f "$arg" ]; then
@@ -188,7 +153,7 @@ validate_apk_files() {
   done
 }
 
-# 옵션에 따라 APK 파일을 선택하는 함수
+# 옵션에 따라 APK 파일을 선택
 select_apk_files() {
   apk_files=()
 
@@ -233,7 +198,7 @@ select_apk_files() {
   fi
 }
 
-# 인자로 APK 파일이 있는지 확인한다.
+# 인자로 APK 파일이 있는지 확인
 validate_and_collect_apk_files() {
   local has_directories=false
   local has_apk_files=false
@@ -303,7 +268,7 @@ validate_and_collect_apk_files() {
       fi
     fi
 
-    # select_multi_interactive 직접 호출
+    # select_interactive 멀티 모드 호출
     # 표시용 basename 배열 생성
     local display_list=()
     for apk in "${apk_list[@]}"; do
@@ -311,7 +276,7 @@ validate_and_collect_apk_files() {
     done
     
     echo -e "${BARROW} ${BOLD}Select APK files to install${NC}\n"
-    select_multi_interactive "Select APK files" "${display_list[@]}"
+    select_interactive "multi" "Select APK files" "${display_list[@]}"
     
     # 선택된 인덱스를 사용하여 원본 경로 매핑
     apk_files=()
@@ -321,185 +286,10 @@ validate_and_collect_apk_files() {
   fi
 }
 
-# 인터랙티브 멀티 선택 함수: 방향키로 이동, Space로 선택/해제, Enter로 확정
-# 사용법: select_multi_interactive "프롬프트" "${array[@]}"
-# 결과: SELECTED_ITEMS 배열에 선택된 항목 저장, SELECTED_INDICES 배열에 선택된 인덱스 저장
-select_multi_interactive() {
-  # 화면 갱신: 깔끔한 선택 UI를 위해 이전 내용 지우기
-  clear
-
-  local prompt="$1"
-  shift
-  local items=("$@")
-  local item_count=${#items[@]}
-  local focused=0
-  local key=""
-  
-  # 선택 상태 추적 (0=선택안됨, 1=선택됨)
-  declare -a selection_status=()
-  # 선택 순서 추적 (선택된 순서대로 인덱스 저장)
-  declare -a selection_order=()
-  for ((i=0; i<item_count; i++)); do
-    selection_status[$i]=0
-  done
-
-  tput civis # 커서 숨김
-
-  while true; do
-    # 헤더 출력
-    echo -e "${BLUE}==> ${BOLD}${prompt}${NC}"
-    echo
-
-    # 항목 출력
-    for i in "${!items[@]}"; do
-      local checkbox="[ ]"
-      local number=$((i + 1))
-      local number_prefix="${number}. "
-      
-      if [ ${selection_status[$i]} -eq 1 ]; then
-        checkbox="[✓]"
-      fi
-
-      if [ $i -eq $focused ]; then
-        # 포커스된 항목 (하이라이트)
-        echo -e "${CYAN}➤ ${checkbox} ${number_prefix}${BOLD}${WHITE}${items[$i]}${NC}"
-      else
-        # 일반 항목
-        if [ ${selection_status[$i]} -eq 1 ]; then
-          # 선택됨: 초록색 체크박스
-          echo -e "  ${GREEN}${checkbox}${NC} ${number_prefix}${items[$i]}"
-        else
-          # 선택안됨: 흐린 텍스트
-          echo -e "  ${checkbox} ${number_prefix}${items[$i]}"
-        fi
-      fi
-    done
-
-    # 하단 안내문
-    echo
-    if [ $item_count -le 9 ]; then
-      echo -e "${DIM}↑/↓: Move  1-${item_count}: Quick select  Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
-    else
-      echo -e "${DIM}↑/↓: Move  Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
-    fi
-
-    # 키 입력 대기
-    IFS= read -rsn1 key
-
-    # ESC 시퀀스 처리 (방향키 등)
-    if [[ $key == $'\x1b' ]]; then
-      IFS= read -rsn2 key
-      if [[ $key == "[A" ]]; then # 위쪽 화살표
-        ((focused--))
-        if [ $focused -lt 0 ]; then focused=$((item_count - 1)); fi
-      elif [[ $key == "[B" ]]; then # 아래쪽 화살표
-        ((focused++))
-        if [ $focused -ge $item_count ]; then focused=0; fi
-      fi
-    fi
-
-    # 키 동작 처리
-    case "$key" in
-      "") # Enter 키
-        # 선택된 항목 수 확인
-        local selected_count=0
-        for status in "${selection_status[@]}"; do
-          if [ $status -eq 1 ]; then
-            ((selected_count++))
-          fi
-        done
-
-        # 아무것도 선택하지 않았으면 현재 포커스된 항목 선택
-        if [ $selected_count -eq 0 ]; then
-          selection_status[$focused]=1
-          selection_order+=("$focused")
-        fi
-
-        break
-        ;;
-      "a"|"A") # A/a 키 - 전체 선택/해제 토글
-        # 모든 항목이 선택되어 있는지 확인
-        local all_selected=1
-        for status in "${selection_status[@]}"; do
-          if [ $status -eq 0 ]; then
-            all_selected=0
-            break
-          fi
-        done
-
-        if [ $all_selected -eq 1 ]; then
-          # 모두 해제
-          for ((i=0; i<item_count; i++)); do
-            selection_status[$i]=0
-          done
-          selection_order=()
-        else
-          # 모두 선택 (순서대로)
-          for ((i=0; i<item_count; i++)); do
-            selection_status[$i]=1
-            selection_order+=("$i")
-          done
-        fi
-        ;;
-      " ") # Space 키 - 선택/해제 토글
-        if [ ${selection_status[$focused]} -eq 0 ]; then
-          selection_status[$focused]=1
-          selection_order+=("$focused")
-        else
-          selection_status[$focused]=0
-          # selection_order에서 제거
-          local new_order=()
-          for idx in "${selection_order[@]}"; do
-            if [ "$idx" -ne "$focused" ]; then
-              new_order+=("$idx")
-            fi
-          done
-          selection_order=("${new_order[@]}")
-        fi
-        ;;
-      [1-9]) # 숫자 키 1-9 (9개 이하일 때만)
-        # 10개 이상이면 숫자키 무시
-        if [ $item_count -le 9 ]; then
-          local input_num=$((key))
-          # 유효한 범위 확인
-          if [ $input_num -ge 1 ] && [ $input_num -le $item_count ]; then
-            local selected_idx=$((input_num - 1))
-            # 해당 항목만 선택 상태로 변경
-            for ((i=0; i<item_count; i++)); do
-              selection_status[$i]=0
-            done
-            selection_status[$selected_idx]=1
-            selection_order=("$selected_idx")
-            # 즉시 확정 (Enter와 동일)
-            break
-          fi
-        fi
-        ;;
-    esac
-
-    # 화면 갱신을 위해 커서 이동 및 줄 지우기
-    local total_lines=$((item_count + 4))
-    for ((i=0; i<total_lines; i++)); do
-      echo -ne "\033[1A"  # 한 줄 위로
-      echo -ne "\033[2K"  # 현재 줄 지우기
-    done
-  done
-
-  tput cnorm # 커서 보이기
-  echo  # 마지막 줄바꿈
-
-  # 선택된 항목을 순서대로 전역 배열에 저장
-  SELECTED_ITEMS=()
-  SELECTED_INDICES=()
-  for idx in "${selection_order[@]}"; do
-    SELECTED_ITEMS+=("${items[$idx]}")
-    SELECTED_INDICES+=("$idx")
-  done
-}
-
-# APK 선택 함수: 사용자로부터 APK 파일 선택을 받음
+# APK 인터랙티브 선택
 select_apk_interactively() {
   echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
+  local apk_list=()
   while IFS= read -r -d '' file; do
     apk_list+=("$file")
   done < <(find . -maxdepth 1 -type f -name "*.apk" -print0)
@@ -549,7 +339,7 @@ select_apk_interactively() {
     display_list+=("$(basename "$apk")")
   done
   
-  select_multi_interactive "📱 Select APK files to install" "${display_list[@]}"
+  select_interactive "multi" "📱 Select APK files to install" "${display_list[@]}"
 
   # 선택된 인덱스를 사용하여 원본 경로 매핑
   selected_apks=()
@@ -564,67 +354,8 @@ select_apk_interactively() {
   fi
 }
 
-# 연결된 디바이스 찾기 및 선택
-find_and_select_device() {
-  devices=$(adb devices | grep 'device$' | cut -f1)
-  # devices=$(adb devices | grep -v devices | grep device | cut -f 1)
-  device_array=($devices)
-  device_count=${#device_array[@]}
-  declare -a device_list=()
-
-  case $device_count in
-    0 ) # 연결된 장치가 없을 경우 에러 메시지 출력
-      echo -e "${ERROR} No connected devices found."; exit 1 ;;
-    1 ) # 연결된 장치가 하나일 경우 해당 장치 선택
-      selected_device=("${device_array[0]}") ;;
-    * ) # 여러 장치가 연결된 경우 사용자에게 선택지 제공
-        # -m 옵션이 있는 경우 모든 디바이스를 선택
-      if [ $opt_m_used -eq 1 ]; then
-        selected_device=("${device_array[@]}")
-      else
-        present_device_selection
-      fi
-      ;;
-  esac
-}
-
-present_device_selection() {
-  # 디바이스 목록을 줄 단위로 분리하여 `device_list` 배열에 저장
-  IFS=$'\n' read -rd '' -a device_list <<< "$devices"
-  
-  # 디바이스 정보를 pretty_device로 포맷팅한 배열 생성
-  local -a formatted_devices=()
-  for device_info in "${device_list[@]}"; do
-    formatted_devices+=("$(pretty_device $device_info)")
-  done
-  
-  # 인터랙티브 선택 실행
-  select_multi_interactive "Select devices for installation" "${formatted_devices[@]}"
-  
-  # 선택된 인덱스를 사용하여 실제 디바이스 ID 배열 생성
-  selected_device=()
-  for idx in "${SELECTED_INDICES[@]}"; do
-    selected_device+=("${device_list[$idx]}")
-  done
-}
-
-# 디바이스 정보 출력 함수
-pretty_device() {
-  local device_id="$1"
-  local props brand model version api
-
-  props=$(adb -s "$device_id" shell getprop)
-
-  brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
-  model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
-  version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
-  api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
-
-  echo "$brand $model ($device_id) Android $version, API $api"
-}
-
+# APK 파일 목록 출력
 pretty_print_apk_files() {
-  # APK 파일들을 출력한다.
   echo -e "${BARROW} ${BOLD}The APK files to install.${NC}"
   local i=1
   for apk_file in "${apk_files[@]}"; do
@@ -633,17 +364,7 @@ pretty_print_apk_files() {
   done
 }
 
-# 선택된 디바이스들을 출력하는 함수
-pretty_print_selected_devices() {
-  echo -e "${BARROW} ${BOLD}Selected devices for installation:${NC}"
-  local i=1
-  for device in "${selected_device[@]}"; do
-    echo "${i}. $(pretty_device $device)"
-    ((i++))
-  done
-}
-
-# APK 파일 설치
+# APK 설치 실행
 execute_installation() {
   # 먼저 디바이스 정보를 시각화하여 출력
   if [ ${#selected_device[@]} -gt 1 ]; then
@@ -682,7 +403,7 @@ execute_installation() {
   done
 }
 
-# 각 APK 파일에 대한 설치 명령을 실행하는 함수
+# 각 APK 파일에 대한 설치 명령 실행
 execute_install_command() {
   local device_opt=$1
   local install_opt=$2
@@ -714,7 +435,7 @@ execute_install_command() {
   esac
 }
 
-# 설치 실패 시 다시 시도하는 함수
+# 설치 실패 시 다시 시도
 retry_install() {
   local failure_reason=$1
   local retry_option=$2
@@ -740,9 +461,9 @@ retry_install() {
       ;;
     *) echo "$result" ;;
   esac
-
 }
 
+# 다운그레이드 실패 처리
 resolve_downgrade() {
   local device_opt=$1
   local install_opt=$2
@@ -762,9 +483,18 @@ resolve_downgrade() {
   
   # 엔터키나 y/Y면 진행, n/N이면 중단
   if [[ -z "$choice" ]] || [[ "$choice" == "y" ]] || [[ "$choice" == "Y" ]]; then
+    # aapt 도구 찾기
+    local aapt=$(find_aapt)
+    if [ -z "$aapt" ]; then
+      echo
+      echo -e "${RED}Error: aapt not found${NC}"
+      echo "Please install Android SDK build-tools or set ANDROID_HOME"
+      return 1
+    fi
+    
     # 패키지 이름 추출
     local package_name
-    package_name=$(aapt dump badging "${apk_file}" | grep package:\ name | awk -F"'" '{print $2}')
+    package_name=$("$aapt" dump badging "${apk_file}" | grep package:\ name | awk -F"'" '{print $2}')
 
     echo
     echo -e "${BARROW} Uninstalling package: ${BOLD}${package_name}${NC}"
@@ -783,7 +513,7 @@ resolve_downgrade() {
   fi
 }
 
-# INSTALL_FAILED_UPDATE_INCOMPATIBLE 오류 처리 함수
+# INSTALL_FAILED_UPDATE_INCOMPATIBLE 오류 처리
 resolve_conflict() {
   local device_opt=$1
   local install_opt=$2
@@ -825,6 +555,7 @@ resolve_conflict() {
   fi
 }
 
+# adb install 실행
 start_adb_install() {
   local device_opt=$1
   local install_opt=$2
@@ -833,93 +564,35 @@ start_adb_install() {
   adb ${device_opt} install ${install_opt} "${apk_file}" 2>&1
 }
 
-# zsh completion 스크립트를 생성합니다.
-generate_zsh_completion() {
-  local completion_path="$1"
+# ─────────────────────────────────────────────────────
+# install 커맨드 메인 진입점
+# ─────────────────────────────────────────────────────
+
+cmd_install() {
+  # --help 옵션 체크 (getopts 전에)
+  for arg in "$@"; do
+    if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
+      show_help_install
+      return 0
+    fi
+  done
   
-  cat > "$completion_path" <<'EOF'
-#compdef ai
-
-_ai() {
-  local -a apk_files
-  apk_files=(*.apk(N-.))
-
-  _arguments -C \
-    '(- *)'{-h,--help}'[Show help message]' \
-    '(- *)'{-v,--version}'[Show version]' \
-    '(- *)--install[Install script to /usr/local/bin]' \
-    '(-a -p)-l[Install latest APK]' \
-    '(-l -p)-a[Install all APKs]' \
-    '(-l -a)-p[Filter APKs by pattern]:pattern' \
-    '-m[Install on all devices]' \
-    '-r[Replace existing app]' \
-    '-t[Allow test APKs]' \
-    '-d[Allow version downgrade]' \
-    '*:APK files:compadd -a apk_files'
-}
-
-_ai "$@"
-EOF
-}
-
-# 스크립트를 /usr/local/bin 에 설치하고 실행 권한 및 격리 해제를 수행합니다.
-install_script() {
-  local src_path
-  src_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-  local filename
-  filename="$(basename "$src_path")"
-  filename="${filename%.sh}"  # .sh 확장자 제거
-  local dest_path="/usr/local/bin/$filename"
-  local completion_dir="/usr/local/share/zsh/site-functions"
-  local completion_path="${completion_dir}/_${filename}"
-
-  echo -e "${BARROW} Installing '${YELLOW}${filename}${NC}' to ${CYAN}/usr/local/bin${NC}..."
-
-  if [ ! -w "/usr/local/bin" ]; then
-    echo -e "${ERROR} Permission denied. Try running with 'sudo'."
-    return 1
-  fi
-
-  cp "$src_path" "$dest_path"
-  chmod +x "$dest_path"
-  xattr -d com.apple.quarantine "$dest_path" 2>/dev/null
-
-  echo -e "${GARROW} Installed successfully at '${CYAN}${dest_path}${NC}'"
-
-  # zsh completion 설치
-  echo
-  echo -e "${BARROW} Installing zsh completion..."
+  # 변수 초기화
+  initialize_install_variables
   
-  if [ ! -d "$completion_dir" ]; then
-    mkdir -p "$completion_dir"
-  fi
-  
-  generate_zsh_completion "$completion_path"
-  
-  if [ $? -eq 0 ]; then
-    echo -e "${GARROW} Zsh completion installed at '${CYAN}${completion_path}${NC}'"
-    echo
-    echo -e "${YELLOW}To enable tab completion:${NC}"
-    echo -e "  1. Restart your terminal, or"
-    echo -e "  2. Run: ${BOLD}exec zsh${NC}"
-  else
-    echo -e "${ERROR} Failed to install zsh completion."
-  fi
-}
-
-main() {
-   # 설치 옵션 처리
-  initialize_variables
-  process_options "$@"
+  # 옵션 파싱
+  process_install_options "$@"
   shift $((OPTIND -1))
+  
+  # 옵션 조합 검증
   handle_option_combinations "$@"
+  
+  # APK 파일 선택
   select_apk_files "$@"
 
-  # 설치할 디바이스 선택
-  find_and_select_device
+  # 설치할 디바이스 선택 (멀티 디바이스 지원)
+  find_and_select_devices_multi $opt_m_used
 
   # APK 설치 실행
   execute_installation
 }
-
-main "$@"

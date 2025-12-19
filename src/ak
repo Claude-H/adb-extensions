@@ -1,0 +1,104 @@
+#!/bin/bash
+#@@BUILD_EXCLUDE_START
+#@@HEADER_START
+#!/bin/bash
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+# ═══════════════════════════════════════════════════
+# ADB extensions kit (ak) - Main Entry Point
+# ADB를 활용하여 안드로이드 개발을 지원하는 CLI 도구
+#
+# 🧑‍💻 작성자: Claude Hwang
+# ═══════════════════════════════════════════════════
+#@@HEADER_END
+
+# ─────────────────────────────────────────────────────
+# 라이브러리 로드
+# ─────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/bootstrap.sh"
+#@@BUILD_EXCLUDE_END
+
+# ─────────────────────────────────────────────────────
+# 도움말
+# ─────────────────────────────────────────────────────
+
+show_help() {
+  echo
+  echo -e "${CYAN}${BOLD}Usage:${NC} ak <command> [arguments...]"
+  echo
+  echo -e "${BOLD}Commands:${NC}"
+  echo -e "  ${BOLD}install${NC} [options] [apk_files...]  Install APK files"
+  echo -e "  ${BOLD}pull${NC} [package] [filename]        Pull APK from device"
+  echo -e "  ${BOLD}info${NC} [package]                   Show app information"
+  echo -e "  ${BOLD}permissions${NC} [package]            List app permissions"
+  echo -e "  ${BOLD}uninstall${NC} [package]              Uninstall app"
+  echo -e "  ${BOLD}clear${NC} [packages...]              Clear app data"
+  echo -e "  ${BOLD}kill${NC} [packages...]               Force-stop app"
+  echo -e "  ${BOLD}launch${NC} <package>                 Launch app"
+  echo -e "  ${BOLD}signature${NC} [package|apk]          Show signature"
+  echo -e "  ${BOLD}activities${NC} [--all]               Show activity stack"
+  echo -e "  ${BOLD}devices${NC}                          List connected devices"
+  echo
+  echo -e "${BOLD}Global Options:${NC}"
+  echo -e "  ${BOLD}--version, -v${NC}    Show version"
+  echo -e "  ${BOLD}--help, -h${NC}       Show this help"
+  echo
+  echo -e "Run '${BOLD}ak <command> --help${NC}' for command-specific help."
+  echo
+}
+
+# ─────────────────────────────────────────────────────
+# 메인 라우팅
+# ─────────────────────────────────────────────────────
+
+main() {
+  # 인자 없으면 도움말
+  if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+  fi
+
+  local command=$1
+  shift
+
+  case "$command" in
+    # 글로벌 옵션
+    --version|-v)
+      show_version
+      ;;
+    --help|-h)
+      show_help
+      ;;
+    
+    # install 커맨드 (이미 로드됨)
+    install)
+      cmd_install "$@"
+      ;;
+    
+    # 다른 커맨드들 (동적 로드 또는 이미 로드됨)
+    pull|info|permissions|uninstall|clear|kill|launch|signature|activities|devices)
+      # 개발 모드: load_command 함수 존재 시 동적 로드
+      if declare -f load_command >/dev/null 2>&1; then
+        if ! load_command "$command"; then
+          echo -e "${ERROR} Command module not found: $command"
+          exit 1
+        fi
+      fi
+      
+      # 단순히 커맨드 호출 (옵션 검증, 디바이스 선택 등은 각 커맨드에서 처리)
+      "cmd_${command}" "$@"
+      ;;
+    
+    *)
+      echo -e "${ERROR} Unknown command: $command"
+      echo
+      show_help
+      exit 1
+      ;;
+  esac
+}
+
+# 스크립트 실행
+main "$@"

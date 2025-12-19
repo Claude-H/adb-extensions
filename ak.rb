@@ -1,0 +1,32 @@
+class AdbExtensionsKit < Formula
+  desc "ADB extensions kit - Essential ADB utilities for Android development"
+  homepage "https://github.com/luminousvault/adb-extensions"
+  url "https://github.com/luminousvault/adb-extensions/archive/refs/tags/v1.0.0.tar.gz"
+  sha256 "REPLACE_WITH_ACTUAL_SHA256"
+  license "MIT"
+  version "1.0.0"
+
+  # depends_on "android-platform-tools"  # adb 의존성
+
+  def install
+    # 빌드 실행
+    system "./build.sh"
+    
+    # 빌드된 단일 파일 설치
+    bin.install "build/ak.bin" => "ak"
+    
+    # Completion 설치
+    zsh_completion.install "build/completions/_ak"
+  end
+
+  test do
+    # 버전 체크
+    assert_match "1.0.0", shell_output("#{bin}/ak --version")
+    
+    # 도움말 체크
+    assert_match "ADB extensions kit", shell_output("#{bin}/ak --version")
+    
+    # install 커맨드 체크
+    assert_match "install", shell_output("#{bin}/ak --help")
+  end
+end

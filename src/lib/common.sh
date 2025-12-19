@@ -1,0 +1,214 @@
+#!/bin/bash
+#@@BUILD_EXCLUDE_START
+# ═══════════════════════════════════════════════════
+# Common Utilities
+# 공통 유틸리티 함수 및 상수 정의
+# ═══════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────
+# VERSION 정보 (소스 직접 실행시 사용, 빌드시 자동 주입됨)
+# ─────────────────────────────────────────────────────
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+VERSION="$(cat "${SCRIPT_DIR}/../VERSION" 2>/dev/null || echo "dev")"
+RELEASE_DATE="$(date +%Y-%m-%d)"
+#@@BUILD_EXCLUDE_END
+
+# ─────────────────────────────────────────────────────
+# 색상 및 스타일 정의
+# ─────────────────────────────────────────────────────
+RED='\033[1;31m'     # 빨간색
+GREEN='\033[1;32m'   # 초록색
+YELLOW='\033[1;33m'  # 노란색
+BLUE='\033[1;34m'    # 파란색
+PURPLE='\033[1;35m'  # 보라색
+CYAN='\033[1;36m'    # 볼드와 옥색
+BOLD='\033[1m'       # 볼드
+DIM='\033[2m'        # 흐리게
+NC='\033[0m'         # 색상 없음
+
+BARROW="${BLUE}==>${NC}"
+GARROW="${GREEN}==>${NC}"
+ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
+
+# ─────────────────────────────────────────────────────
+# 버전 정보 출력
+# ─────────────────────────────────────────────────────
+show_version() {
+  local script_name=$(basename "$0")
+  local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
+  
+  echo
+  echo -e "                                        ${BOLD}${script_name}${NC} ${GREEN}${VERSION}${NC} - Released on ${RELEASE_DATE}"
+  echo -e "        ${GREEN}::${NC}                   ${GREEN}.::${NC}        ------------------------------------"
+  echo -e "       ${GREEN}:#*+.${NC}                ${GREEN}:+*#.${NC}       ${BOLD}${YELLOW}ADB Version:${NC} ${adb_version}"
+  echo -e "        ${GREEN}:**+:${NC}    ${GREEN}......${NC}    ${GREEN}-+**.${NC}        ${BOLD}${YELLOW}Author:${NC} Claude Hwang"
+  echo -e "         ${GREEN}.*+=---::::::::---+*+${NC}          ${BOLD}${YELLOW}License:${NC} MIT"
+  echo -e "        ${YELLOW}:-=----:--------:---==-.${NC}        ${BOLD}${YELLOW}Language:${NC} Bash"
+  echo -e "      ${YELLOW}:++=---==============---=+=.${NC}      ${BOLD}${YELLOW}Supported OS:${NC} macOS, Linux"
+  echo -e "    ${RED}.+*+=+*%#++++++++++++++##+=+**-${NC}     ${BOLD}${YELLOW}Dependencies:${NC} adb, aapt, apksigner"
+  echo -e "   ${RED}.****+%@@%+++++++++++++*@@@#+**#+${NC}    ${BOLD}${YELLOW}Repository:${NC} https://github.com/luminousvault/adb-extensions"
+  echo -e "   ${CYAN}*#*****#*+++++++++++++++*##*****#=${NC}   "
+  echo -e "  ${BLUE}-%#*****++++++++++++++++++++****##%.${NC}  ${BOLD}${YELLOW}Purpose:${NC} ADB extensions kit - Essential ADB utilities"
+  echo -e "                                        ${BOLD}${YELLOW}Features:${NC} APK install, Device management, App control"
+  echo
+}
+
+# ─────────────────────────────────────────────────────
+# 패키지 관리 유틸리티
+# ─────────────────────────────────────────────────────
+
+# 현재 포그라운드 앱의 패키지명을 ADB를 통해 추출
+detect_foreground_package() {
+    adb -s "$G_SELECTED_DEVICE" shell dumpsys activity activities | grep -i Hist | head -n 1 | sed -n 's/.* u0 \([^\/ ]*\)\/.*/\1/p'
+}
+
+# 패키지 이름 형식이 유효한지 확인
+validate_package_name() {
+    local pkg="$1"
+    [[ "$pkg" =~ ^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)+$ ]]
+}
+
+# 패키지 설치 여부 확인
+is_package_installed() {
+    local package_name="$1"
+    adb -s "$G_SELECTED_DEVICE" shell pm list packages --user 0 | grep -q "^package:$package_name$"
+    return $?
+}
+
+# 패키지명 형식과 설치 여부를 확인하고 실패 시 종료
+validate_package_or_exit() {
+    local package_name="$1"
+    if ! validate_package_name "$package_name"; then
+        echo -e "${RED}ERROR: Invalid package name format:${NC} $package_name"
+        echo
+        exit 1
+    fi
+    if ! is_package_installed "$package_name"; then
+        echo -e "${RED}ERROR: Package not installed on the device:${NC} $package_name"
+        echo
+        exit 1
+    fi
+}
+
+# 지정한 패키지의 base.apk 경로를 추출하여 반환합니다. 실패 시 1을 반환
+get_apk_path() {
+    local package_name=$1
+    local apk_path
+    apk_path=$(adb -s "$G_SELECTED_DEVICE" shell pm list packages -f --user 0 | grep -x "package:.*=$package_name")
+
+    if [ -z "$apk_path" ]; then
+        echo -e "${RED}ERROR: Package not found:${NC} $package_name"
+        echo
+        return 1
+    fi
+
+    apk_path=$(echo "$apk_path" | sed -n 's/package:\(.*base\.apk\)=.*/\1/p')
+
+    if [ -z "$apk_path" ]; then
+        echo -e "${RED}ERROR: Failed to extract APK path for package:${NC} $package_name"
+        echo
+        return 1
+    fi
+
+    echo "$apk_path"
+}
+
+# ─────────────────────────────────────────────────────
+# Android SDK 도구 탐지
+# ─────────────────────────────────────────────────────
+
+# Android SDK 홈 디렉토리 탐지 (3단계 폴백)
+detect_android_home() {
+  # 1순위: 환경변수
+  if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME/build-tools" ]; then
+    echo "$ANDROID_HOME"
+    return 0
+  fi
+  
+  # 2순위: which adb로 유추
+  local adb_path=$(which adb 2>/dev/null)
+  if [ -n "$adb_path" ]; then
+    # realpath로 심볼릭 링크 추적 (없으면 스킵)
+    if command -v realpath >/dev/null 2>&1; then
+      adb_path=$(realpath "$adb_path")
+    fi
+    # adb는 보통 $ANDROID_HOME/platform-tools/adb
+    local sdk_root=$(dirname "$(dirname "$adb_path")")
+    if [ -d "$sdk_root/build-tools" ]; then
+      echo "$sdk_root"
+      return 0
+    fi
+  fi
+  
+  # 3순위: 일반적인 설치 경로
+  local common_paths=(
+    "$HOME/Library/Android/sdk"        # macOS 기본
+    "$HOME/Android/Sdk"                 # Linux 기본
+    "/usr/local/share/android-sdk"     # Homebrew
+  )
+  for path in "${common_paths[@]}"; do
+    if [ -d "$path/build-tools" ]; then
+      echo "$path"
+      return 0
+    fi
+  done
+  
+  return 1
+}
+
+# Android SDK 도구 찾기 (최신 버전 선택)
+find_android_tool() {
+  local tool_name=$1
+  
+  # Android SDK 찾기
+  local android_home=$(detect_android_home)
+  if [ -z "$android_home" ]; then
+    return 1
+  fi
+  
+  local build_tools_dir="$android_home/build-tools"
+  if [ ! -d "$build_tools_dir" ]; then
+    return 1
+  fi
+  
+  # 최신 버전 찾기 (버전 정렬)
+  local latest_version=$(ls -1 "$build_tools_dir" | sort -V | tail -n1)
+  if [ -z "$latest_version" ]; then
+    return 1
+  fi
+  
+  local tool_path="$build_tools_dir/$latest_version/$tool_name"
+  if [ -x "$tool_path" ]; then
+    echo "$tool_path"
+    return 0
+  fi
+  
+  return 1
+}
+
+# aapt 도구 찾기
+find_aapt() {
+  find_android_tool "aapt"
+}
+
+# apksigner 도구 찾기
+find_apksigner() {
+  find_android_tool "apksigner"
+}
+
+# ─────────────────────────────────────────────────────
+# 배열 유틸리티
+# ─────────────────────────────────────────────────────
+
+# 목록에서 중복 확인
+contains() {
+    local value="$1"
+    shift
+    local item
+    for item in "$@"; do
+        if [ "$item" == "$value" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
