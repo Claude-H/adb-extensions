@@ -3,31 +3,49 @@
 _ak() {
   local -a commands
   commands=(
-    'install:Install APK files'
-    'pull:Pull APK file from device'
-    'info:Show package information'
-    'permissions:List package permissions'
-    'uninstall:Uninstall package'
+    'activities:Show activity stack'
     'clear:Clear app data and cache'
+    'devices:Show connected devices'
+    'info:Show package information'
+    'install:Install APK files'
     'kill:Force-stop package'
     'launch:Launch package'
+    'permissions:List package permissions'
+    'pull:Pull APK file from device'
     'signature:Extract signature hash'
-    'activities:Show activity stack'
-    'devices:Show connected devices'
+    'uninstall:Uninstall package'
   )
   
   _arguments -C \
     '(- *)'{-h,--help}'[Show help message]' \
     '(- *)'{-v,--version}'[Show version]' \
     '1:command:->command' \
-    '*::arg:->args'
+    '*::arg:->args' && return 0
   
   case $state in
-    command)
+    command)    
       _describe 'ak commands' commands
       ;;
     args)
       case $words[1] in
+        activities)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '(-a --all)'{-a,--all}'[Show all tasks]'
+          ;;
+        clear)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '*:package name:_message "package name"'
+          ;;
+        devices)
+          _arguments '(- *)'{-h,--help}'[Show help for this command]'
+          ;;
+        info)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name:_message "package name"'
+          ;;
         install)
           local -a apk_files
           apk_files=(*.apk(N-.))
@@ -42,17 +60,17 @@ _ak() {
             '-d[Allow version downgrade]' \
             '*:APK files:compadd -a apk_files'
           ;;
-        activities)
-          _arguments \
-            '(- *)'{-h,--help}'[Show help for this command]' \
-            '(-a --all)'{-a,--all}'[Show all tasks]'
-          ;;
-        clear|kill)
+        kill)
           _arguments \
             '(- *)'{-h,--help}'[Show help for this command]' \
             '*:package name:_message "package name"'
           ;;
-        info|permissions|uninstall)
+        launch)
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name:_message "package name"'
+          ;;
+        permissions)
           _arguments \
             '(- *)'{-h,--help}'[Show help for this command]' \
             '1:package name:_message "package name"'
@@ -60,24 +78,22 @@ _ak() {
         pull)
           _arguments \
             '(- *)'{-h,--help}'[Show help for this command]' \
-            '1:package name:_message "package name"' \
-            '2:save file name:_files'
-          ;;
-        launch)
-          _arguments \
-            '(- *)'{-h,--help}'[Show help for this command]' \
-            '1:package name:_message "package name"'
+            '1:package name or file name:_message "package name or save file name"' \
+            '2:save file name or package name:_files'
           ;;
         signature)
           _arguments \
             '(- *)'{-h,--help}'[Show help for this command]' \
-            '1:package name or APK file:_files -g "*.apk"'
+            '1:package name or APK file:_files -g "*.apk(-.)"'
           ;;
-        devices)
-          _arguments '(- *)'{-h,--help}'[Show help for this command]'
+        uninstall)
+          local -a apk_files
+          apk_files=(*.apk(N-.))
+          _arguments \
+            '(- *)'{-h,--help}'[Show help for this command]' \
+            '1:package name or APK file:compadd -a apk_files'
           ;;
         *)
-          # 알 수 없는 커맨드는 --help 옵션만 제공
           _arguments '(- *)'{-h,--help}'[Show help for this command]'
           ;;
       esac

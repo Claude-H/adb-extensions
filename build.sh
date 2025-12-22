@@ -360,7 +360,7 @@ EOF
     '(- *)'{-h,--help}'[Show help message]' \
     '(- *)'{-v,--version}'[Show version]' \
     '1:command:->command' \
-    '*::arg:->args'
+    '*::arg:->args' && return 0
   
   case $state in
     command)

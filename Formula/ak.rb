@@ -23,7 +23,7 @@ class Ak < Formula
 
   test do
     # 버전 체크
-    assert_match "1.0.2", shell_output("#{bin}/ak --version")
+    assert_match "1.0.3", shell_output("#{bin}/ak --version")
     
     # 도움말 체크
     assert_match "ADB extensions kit", shell_output("#{bin}/ak --version")

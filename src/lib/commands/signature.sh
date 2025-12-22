@@ -14,9 +14,11 @@ AK_COMPLETION_DESC
 # Completion handler: zsh completion code for signature command
 : <<'AK_COMPLETION'
         signature)
+          local -a apk_files
+          apk_files=(*.apk(N-.))
           _arguments \
             '(- *)'{-h,--help}'[Show help for this command]' \
-            '1:package name or APK file:_files -g "*.apk"'
+            '1:package name or APK file:compadd -a apk_files'
           ;;
 AK_COMPLETION
 
