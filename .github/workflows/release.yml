@@ -63,11 +63,6 @@ jobs:
 
           echo "Tag v$VERSION does not exist - proceeding with release"
       
-      - name: Install shc
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shc
-      
       - name: Run build
         run: |
           chmod +x build.sh
@@ -87,34 +82,7 @@ jobs:
       - name: Create source archive
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          
-          # #region agent log
-          # Hypothesis A, B, C, E: Log directory state before tar
-          echo "::group::Debug - Directory state before tar"
-          echo "PWD: $(pwd)"
-          echo "Total files: $(ls -la | wc -l)"
-          ls -la
-          echo "::endgroup::"
-          
-          # List all files that will be included (excluding patterns)
-          echo "::group::Debug - Files to be archived"
-          find . -type f \
-            ! -path './.git/*' \
-            ! -path './.github/*' \
-            ! -path './build/*' \
-            ! -name '.gitignore' \
-            ! -name 'adb-extensions-*.tar.gz' | head -20
-          echo "Total files to archive: $(find . -type f ! -path './.git/*' ! -path './.github/*' ! -path './build/*' ! -name '.gitignore' ! -name 'adb-extensions-*.tar.gz' | wc -l)"
-          echo "::endgroup::"
-          # #endregion
-          
-          # #region agent log
-          # Hypothesis A: Exclude the tar.gz file explicitly and create in /tmp first
-          echo "::group::Debug - Creating tar archive"
-          echo "Output file: /tmp/adb-extensions-v${VERSION}.tar.gz"
-          echo "::endgroup::"
-          # #endregion
-          
+
           tar -czpf /tmp/adb-extensions-v${VERSION}.tar.gz \
             --exclude='.git' \
             --exclude='.github' \
@@ -122,16 +90,8 @@ jobs:
             --exclude='.cursor' \
             --exclude='*.tar.gz' \
             .
-          
-          # #region agent log
-          # Hypothesis A: Move to current directory after creation
+
           mv /tmp/adb-extensions-v${VERSION}.tar.gz .
-          echo "::group::Debug - Tar archive created"
-          echo "Size: $(du -h adb-extensions-v${VERSION}.tar.gz | cut -f1)"
-          echo "Location: $(pwd)/adb-extensions-v${VERSION}.tar.gz"
-          ls -lh adb-extensions-v${VERSION}.tar.gz
-          echo "::endgroup::"
-          # #endregion
       
       - name: Calculate SHA256
         id: sha256
@@ -140,7 +100,41 @@ jobs:
           SHA256=$(shasum -a 256 adb-extensions-v${VERSION}.tar.gz | awk '{print $1}')
           echo "sha256=$SHA256" >> $GITHUB_OUTPUT
           echo "SHA256: $SHA256"
-      
+
+      - name: Extract CHANGELOG for version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract the changelog section for this version
+          # Format: ## [VERSION] - DATE
+          CHANGELOG_CONTENT=$(awk -v ver="$VERSION" '
+            BEGIN { found=0; content="" }
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") {
+                found=1
+                next
+              }
+            }
+            found { content = content $0 "\n" }
+            END { print content }
+          ' CHANGELOG.md)
+
+          if [ -z "$CHANGELOG_CONTENT" ]; then
+            echo "Error: No CHANGELOG entry found for version $VERSION"
+            echo "Please add a changelog entry in CHANGELOG.md before releasing"
+            exit 1
+          fi
+
+          # Save to output using heredoc to handle multiline content
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "Extracted changelog:"
+          echo "$CHANGELOG_CONTENT"
+
       - name: Update Homebrew Formula
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -167,7 +161,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore(release): update Homebrew Formula for v${VERSION}"
+            git commit -m "Release: update Homebrew Formula for v${VERSION}"
             git push origin HEAD:${CURRENT_BRANCH}
             echo "Formula updated and committed to ${CURRENT_BRANCH} branch"
             
@@ -193,25 +187,20 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
+          generate_release_notes: true
           body: |
             ## ADB Extensions Kit (ak) v${{ steps.version.outputs.version }}
 
+            ### Changes
+
+            ${{ steps.changelog.outputs.content }}
+
             ### Installation
 
-            **Option 1: Using tap**
             ```bash
             brew tap luminousvault/adb-extensions
             brew install ak
             ```
-
-            **Option 2: Direct install (no tap required)**
-            ```bash
-            brew install https://raw.githubusercontent.com/luminousvault/adb-extensions/main/Formula/ak.rb
-            ```
-
-            ### Changes
-
-            See [CHANGELOG.md](https://github.com/luminousvault/adb-extensions/blob/main/CHANGELOG.md) for details.
           files: |
             adb-extensions-v${{ steps.version.outputs.version }}.tar.gz
           draft: false

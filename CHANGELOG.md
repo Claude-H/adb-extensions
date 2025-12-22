@@ -1,6 +1,15 @@
 # Changelog
 
-모든 주요 변경 사항이 이 파일에 기록됩니다.
+All notable changes to this project will be documented in this file.
+
+## [1.0.3] - 2025-12-22
+
+### Fixed
+- Fixed ADB and Android SDK detection when only platform-tools is installed via Homebrew
+- Improved error messages for missing Android tools with installation guide
+
+### Changed
+- Release workflow now requires CHANGELOG entry (fails if missing)
 
 ## [1.0.2] - 2025-12-19
 
@@ -19,22 +28,22 @@
 - Homebrew installation failure due to missing build artifacts
 - Included prebuilt files in release archive
 
-## [1.0.0]
+## [1.0.0] - 2025-12-19
 
-### 첫 공개 릴리스
+### First Public Release
 
-**핵심 기능:**
-- APK 관리: install, pull
-- 앱 정보: info, permissions, signature, activities
-- 앱 제어: launch, kill, clear, uninstall
-- 디바이스 관리: devices
+**Core Features:**
+- APK management: install, pull
+- App information: info, permissions, signature, activities
+- App control: launch, kill, clear, uninstall
+- Device management: devices
 
-**아키텍처:**
-- 모듈형 소스 구조 (src/lib/)
-- 빌드 시스템 (단일 파일 병합)
-- 바이너리 컴파일 지원 (shc)
-- Zsh 자동완성
+**Architecture:**
+- Modular source structure (src/lib/)
+- Build system (single file merge)
+- Binary compilation support (shc)
+- Zsh completion support
 
-**설치 방법:**
-- Homebrew 지원
-- 소스 빌드 지원
+**Installation:**
+- Homebrew support
+- Source build support

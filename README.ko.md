@@ -31,12 +31,6 @@ brew tap luminousvault/adb-extensions
 brew install ak
 ```
 
-또는 tap 없이 직접 설치:
-
-```bash
-brew install https://raw.githubusercontent.com/luminousvault/adb-extensions/main/Formula/ak.rb
-```
-
 ### 소스에서 설치
 
 ```bash
