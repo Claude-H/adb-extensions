@@ -114,6 +114,26 @@ get_apk_path() {
 }
 
 # ─────────────────────────────────────────────────────
+# ADB 필수 체크
+# ─────────────────────────────────────────────────────
+
+# ADB 사용 가능 여부 확인
+check_adb_available() {
+  if ! command -v adb >/dev/null 2>&1; then
+    echo
+    echo -e "${ERROR} ADB is not installed."
+    echo
+    echo -e "${YELLOW}Installation:${NC}"
+    echo -e "  ${BOLD}macOS:${NC}   brew install android-platform-tools"
+    echo -e "  ${BOLD}Ubuntu:${NC}  sudo apt install adb"
+    echo -e "  ${BOLD}Manual:${NC}  https://developer.android.com/studio/releases/platform-tools"
+    echo
+    return 1
+  fi
+  return 0
+}
+
+# ─────────────────────────────────────────────────────
 # Android SDK 도구 탐지
 # ─────────────────────────────────────────────────────
 
@@ -125,33 +145,52 @@ detect_android_home() {
     return 0
   fi
   
+  local sdk_root=""
+  
   # 2순위: which adb로 유추
+  # 주의: brew install android-platform-tools로 ADB만 설치된 경우
+  # (예: /opt/homebrew/bin/adb)는 build-tools가 없으므로 SDK root로 인정하지 않음
+  # 이 경우 aapt/apksigner 기능을 사용할 수 없음
   local adb_path=$(which adb 2>/dev/null)
   if [ -n "$adb_path" ]; then
-    # realpath로 심볼릭 링크 추적 (없으면 스킵)
+    # realpath로 심볼릭 링크 추적
     if command -v realpath >/dev/null 2>&1; then
       adb_path=$(realpath "$adb_path")
     fi
-    # adb는 보통 $ANDROID_HOME/platform-tools/adb
-    local sdk_root=$(dirname "$(dirname "$adb_path")")
-    if [ -d "$sdk_root/build-tools" ]; then
-      echo "$sdk_root"
-      return 0
+    
+    # adb가 platform-tools 디렉토리에 있는 경우만 SDK root로 추론
+    # (예: $ANDROID_HOME/platform-tools/adb 형태)
+    local parent_dir=$(dirname "$adb_path")
+    if [[ "$(basename "$parent_dir")" == "platform-tools" ]]; then
+      local candidate=$(dirname "$parent_dir")
+      # build-tools가 실제로 존재하고 비어있지 않은지 확인
+      if [ -d "$candidate/build-tools" ] && [ -n "$(ls -A "$candidate/build-tools" 2>/dev/null)" ]; then
+        sdk_root="$candidate"
+      fi
     fi
   fi
   
   # 3순위: 일반적인 설치 경로
-  local common_paths=(
-    "$HOME/Library/Android/sdk"        # macOS 기본
-    "$HOME/Android/Sdk"                 # Linux 기본
-    "/usr/local/share/android-sdk"     # Homebrew
-  )
-  for path in "${common_paths[@]}"; do
-    if [ -d "$path/build-tools" ]; then
-      echo "$path"
-      return 0
-    fi
-  done
+  if [ -z "$sdk_root" ]; then
+    local common_paths=(
+      "$HOME/Library/Android/sdk"        # macOS 기본
+      "$HOME/Android/Sdk"                # Linux 기본
+      "/usr/local/share/android-sdk"     # Homebrew
+    )
+    for path in "${common_paths[@]}"; do
+      if [ -d "$path/build-tools" ] && [ -n "$(ls -A "$path/build-tools" 2>/dev/null)" ]; then
+        sdk_root="$path"
+        break
+      fi
+    done
+  fi
+  
+  # SDK를 찾았으면 현재 세션에 ANDROID_HOME 설정 (다음 호출 시 1순위에서 바로 찾음)
+  if [ -n "$sdk_root" ]; then
+    export ANDROID_HOME="$sdk_root"
+    echo "$sdk_root"
+    return 0
+  fi
   
   return 1
 }
@@ -160,6 +199,12 @@ detect_android_home() {
 find_android_tool() {
   local tool_name=$1
   
+  # 먼저 PATH에서 찾기 (시스템에 직접 설치된 경우)
+  if command -v "$tool_name" >/dev/null 2>&1; then
+    echo "$tool_name"
+    return 0
+  fi
+  
   # Android SDK 찾기
   local android_home=$(detect_android_home)
   if [ -z "$android_home" ]; then
@@ -167,7 +212,7 @@ find_android_tool() {
   fi
   
   local build_tools_dir="$android_home/build-tools"
-  if [ ! -d "$build_tools_dir" ]; then
+  if [ ! -d "$build_tools_dir" ] || [ -z "$(ls -A "$build_tools_dir" 2>/dev/null)" ]; then
     return 1
   fi
   

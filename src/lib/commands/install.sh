@@ -38,7 +38,7 @@ show_help_install() {
   echo -e "  -h\t\tShow this help message and exit."
   echo
   echo -e "${BOLD}APK Selection Options (mutually exclusive):${NC}"
-  echo -e "  (none)\t\tSelect APK files interactively from the current directory (default)."
+  echo -e "  (none)\tSelect APK files interactively from the current directory (default)."
   echo -e "  <directories>\tSelect APK files interactively from the specified directories."
   echo -e "  <apk files>\tDirectly specify APK files to install."
   echo -e "  -l\t\tInstall the latest APK file from the current directory."
@@ -487,8 +487,16 @@ resolve_downgrade() {
     local aapt=$(find_aapt)
     if [ -z "$aapt" ]; then
       echo
-      echo -e "${RED}Error: aapt not found${NC}"
-      echo "Please install Android SDK build-tools or set ANDROID_HOME"
+      echo -e "${ERROR} aapt not found."
+      echo
+      echo -e "${YELLOW}aapt is included in Android SDK build-tools.${NC}"
+      echo
+      echo -e "${BOLD}Solutions:${NC}"
+      echo -e "  1. Install Android Studio and add build-tools via SDK Manager"
+      echo -e "  2. Set ANDROID_HOME environment variable:"
+      echo -e "     ${DIM}export ANDROID_HOME=\$HOME/Library/Android/sdk  # macOS${NC}"
+      echo -e "     ${DIM}export ANDROID_HOME=\$HOME/Android/Sdk          # Linux${NC}"
+      echo
       return 1
     fi
     

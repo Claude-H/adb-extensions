@@ -58,8 +58,25 @@ cmd_signature() {
         esac
     done
     
+    # apksigner 필수 체크 (가장 먼저 확인)
+    local apksigner=$(find_apksigner)
+    if [ -z "$apksigner" ]; then
+        echo
+        echo -e "${ERROR} apksigner not found."
+        echo
+        echo -e "${YELLOW}apksigner is included in Android SDK build-tools.${NC}"
+        echo
+        echo -e "${BOLD}Solutions:${NC}"
+        echo -e "  1. Install Android Studio and add build-tools via SDK Manager"
+        echo -e "  2. Set ANDROID_HOME environment variable:"
+        echo -e "     ${DIM}export ANDROID_HOME=\$HOME/Library/Android/sdk  # macOS${NC}"
+        echo -e "     ${DIM}export ANDROID_HOME=\$HOME/Android/Sdk          # Linux${NC}"
+        echo
+        exit 1
+    fi
+    
     local input_param=$1
-    local tmp_apk apk_path apksigner signature_output is_local_apk=false
+    local tmp_apk apk_path signature_output is_local_apk=false
     
     # 로컬 APK 파일인지 먼저 확인
     if [[ "$input_param" == *.apk ]] && [ -f "$input_param" ]; then
@@ -118,15 +135,6 @@ cmd_signature() {
         fi
         apk_path="$tmp_apk"
         echo
-    fi
-
-    # Find apksigner using auto-detection
-    apksigner=$(find_apksigner)
-    if [ -z "$apksigner" ]; then
-        echo -e "${RED}Error: apksigner not found${NC}"
-        echo "Please install Android SDK build-tools or set ANDROID_HOME"
-        [ "$is_local_apk" = false ] && rm -f "$tmp_apk"
-        exit 1
     fi
 
     echo -e "${BLUE}==> Extracting signature with apksigner...${NC}"
