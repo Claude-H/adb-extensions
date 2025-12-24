@@ -34,12 +34,100 @@ show_help_signature() {
     echo "Arguments:"
     echo "  packageName      - Package name installed on the device (e.g., com.example.app)"
     echo "  /path/to/app.apk - Local APK file path (must end with .apk)"
-    echo "  (no argument)    - Auto-detect the current foreground app"
+    echo "  (no argument)    - Interactive selection: foreground apps from all devices + APK files"
     echo
     echo "Note: Requires Android SDK build-tools (apksigner)"
     echo "      Set ANDROID_HOME or ensure 'adb' is in PATH"
     echo
     exit 1
+}
+
+# 인터렉티브 선택: 모든 디바이스의 Foreground App + APK 파일들
+select_signature_target_interactively() {
+    local display_list=()
+    local source_types=()  # "device" 또는 "apk"를 저장
+    local source_data=()   # 패키지명 또는 APK 경로 저장
+    
+    # 1. 모든 연결된 디바이스의 Foreground app 가져오기
+    if command -v adb &> /dev/null; then
+        local devices
+        devices=$(adb devices | grep 'device$' | cut -f1)
+        local device_array
+        IFS=$'\n' read -rd '' -a device_array <<< "$devices"
+        
+        if [ ${#device_array[@]} -gt 0 ]; then
+            for device_id in "${device_array[@]}"; do
+                # 각 디바이스의 foreground package 감지 (개선된 함수 사용)
+                local foreground_package
+                foreground_package=$(detect_foreground_package "$device_id" 2>/dev/null)
+                
+                if [ -n "$foreground_package" ] && [ "$foreground_package" != "null" ]; then
+                    # 디바이스 정보 포맷팅
+                    local device_info=$(pretty_device "$device_id" "minimal")
+                    
+                    display_list+=("📱 $foreground_package ($device_info)")
+                    source_types+=("device")
+                    source_data+=("$device_id|$foreground_package")
+                fi
+            done
+        fi
+    fi
+    
+    # 2. 현재 폴더의 APK 파일들 스캔
+    echo
+    echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
+    get_apk_list "." "name"
+    for file in "${APK_LIST[@]}"; do
+        display_list+=("📦 $(basename "$file")")
+        source_types+=("apk")
+        source_data+=("$file")
+    done
+    
+    # 3. 옵션이 없으면 에러
+    if [ ${#display_list[@]} -eq 0 ]; then
+        echo
+        echo -e "${ERROR} No options available:"
+        echo -e "  - No foreground app detected on any connected device"
+        echo -e "  - No APK files found in current directory"
+        echo
+        echo "Please specify a package name or APK file path explicitly."
+        exit 1
+    fi
+    
+    # 4. 옵션이 1개만 있으면 자동 선택
+    if [ ${#display_list[@]} -eq 1 ]; then
+        if [ "${source_types[0]}" = "device" ]; then
+            IFS='|' read -r device_id package_name <<< "${source_data[0]}"
+            SIGNATURE_TARGET="$package_name"
+            SIGNATURE_TYPE="package"
+            SIGNATURE_DEVICE="$device_id"
+            echo -e "${BARROW} Auto-selected: ${YELLOW}$package_name${NC} on ${DIM}$device_id${NC}"
+        else
+            SIGNATURE_TARGET="${source_data[0]}"
+            SIGNATURE_TYPE="apk"
+            SIGNATURE_DEVICE=""
+            echo -e "${BARROW} Auto-selected: ${YELLOW}$(basename "${source_data[0]}")${NC}"
+        fi
+        return 0
+    fi
+    
+    # 5. 인터렉티브 선택 (단일 선택)
+    echo
+    select_interactive "single" "Select target for signature extraction" "${display_list[@]}"
+    
+    # 6. 선택된 항목 처리
+    local selected_idx=$SELECTED_INDEX
+    
+    if [ "${source_types[$selected_idx]}" = "device" ]; then
+        IFS='|' read -r device_id package_name <<< "${source_data[$selected_idx]}"
+        SIGNATURE_TARGET="$package_name"
+        SIGNATURE_TYPE="package"
+        SIGNATURE_DEVICE="$device_id"
+    else
+        SIGNATURE_TARGET="${source_data[$selected_idx]}"
+        SIGNATURE_TYPE="apk"
+        SIGNATURE_DEVICE=""
+    fi
 }
 
 cmd_signature() {
@@ -79,56 +167,87 @@ cmd_signature() {
     
     local input_param=$1
     local tmp_apk apk_path signature_output is_local_apk=false
+    local target_device=""
     
-    # 로컬 APK 파일인지 먼저 확인
-    if [[ "$input_param" == *.apk ]] && [ -f "$input_param" ]; then
-        is_local_apk=true
-    fi
-    
-    # 로컬 APK가 아닌 경우에만 디바이스 선택
-    if [ "$is_local_apk" = false ]; then
-        find_and_select_device
-    fi
-
-    echo
-    
-    # 입력 파라미터가 없으면 포그라운드 앱 자동 감지
-    if [ -z "$input_param" ]; then
-        input_param=$(detect_foreground_package)
-        echo -e "${YELLOW}Auto-detected package:${NC} $input_param"
-    # 입력이 .apk로 끝나면 로컬 APK 파일로 간주
-    elif [[ "$input_param" == *.apk ]]; then
-        is_local_apk=true
-        echo -e "${BLUE}Using local APK file:${NC} $input_param"
-        
-        # 로컬 APK 파일 존재 여부 확인
-        if [ ! -f "$input_param" ]; then
-            echo -e "${RED}ERROR: Local APK file not found:${NC} $input_param"
-            echo
-            exit 1
+    # 인자가 제공된 경우 - 기존 로직 유지
+    if [ -n "$input_param" ]; then
+        # 로컬 APK 파일인지 먼저 확인
+        if [[ "$input_param" == *.apk ]] && [ -f "$input_param" ]; then
+            is_local_apk=true
         fi
         
-        # 절대 경로로 변환
-        apk_path=$(realpath "$input_param")
-        echo -e "${GREEN}==> Using APK file:${NC} $apk_path"
+        # 로컬 APK가 아닌 경우에만 디바이스 선택
+        if [ "$is_local_apk" = false ]; then
+            find_and_select_device
+            target_device="$G_SELECTED_DEVICE"
+        fi
+
+        echo
+        
+        # 입력이 .apk로 끝나면 로컬 APK 파일로 간주
+        if [[ "$input_param" == *.apk ]]; then
+            is_local_apk=true
+            echo -e "${BLUE}Using local APK file:${NC} $input_param"
+            
+            # 로컬 APK 파일 존재 여부 확인
+            if [ ! -f "$input_param" ]; then
+                echo -e "${RED}ERROR: Local APK file not found:${NC} $input_param"
+                echo
+                exit 1
+            fi
+            
+            # 절대 경로로 변환
+            apk_path=$(realpath "$input_param")
+            echo -e "${GREEN}==> Using APK file:${NC} $apk_path"
+        else
+            echo -e "${BLUE}Using specified package:${NC} $input_param"
+            validate_package_or_exit "$input_param"
+        fi
     else
-        echo -e "${BLUE}Using specified package:${NC} $input_param"
-        validate_package_or_exit "$input_param"
+        # 인자가 없는 경우 - 새로운 인터렉티브 로직
+        select_signature_target_interactively
+        
+        if [ "$SIGNATURE_TYPE" = "package" ]; then
+            input_param="$SIGNATURE_TARGET"
+            target_device="$SIGNATURE_DEVICE"
+            is_local_apk=false
+            echo
+            echo -e "${BLUE}Selected package:${NC} $input_param"
+            echo -e "${DIM}Device:${NC} $(pretty_device "$target_device" short)"
+            
+            # 패키지 검증은 해당 디바이스에서 수행
+            G_SELECTED_DEVICE="$target_device"
+            validate_package_or_exit "$input_param"
+        else
+            # APK 파일
+            input_param="$SIGNATURE_TARGET"
+            is_local_apk=true
+            echo
+            echo -e "${BLUE}Selected APK file:${NC} $(basename "$input_param")"
+            
+            # 절대 경로로 변환
+            apk_path=$(realpath "$input_param")
+            echo -e "${GREEN}==> Using APK file:${NC} $apk_path"
+        fi
     fi
 
     echo
 
     # 로컬 APK 파일이 아닌 경우 디바이스에서 APK 추출
     if [ "$is_local_apk" = false ]; then
+        # target_device가 설정되어 있으면 사용, 아니면 G_SELECTED_DEVICE 사용
+        local device_to_use="${target_device:-$G_SELECTED_DEVICE}"
+        
         tmp_apk="tmp_signature_${input_param}.apk"
-        apk_path=$(get_apk_path "$input_param") || exit 1
+        apk_path=$(adb -s "$device_to_use" shell pm path "$input_param" 2>/dev/null | head -n 1 | cut -d':' -f2 | tr -d '\r\n')
+        
         if [ -z "$apk_path" ]; then
             echo -e "${RED}ERROR: Could not determine APK path for package:${NC} $input_param"
             exit 1
         fi
 
         echo -e "${BLUE}==> Pulling APK from device...${NC}"
-        adb -s "$G_SELECTED_DEVICE" pull "$apk_path" "$tmp_apk" > /dev/null
+        adb -s "$device_to_use" pull "$apk_path" "$tmp_apk" > /dev/null
         if [ $? -ne 0 ]; then
             echo
             echo -e "${RED}ERROR: Failed to pull APK from device. Check device connection and permissions.${NC}"
@@ -140,11 +259,13 @@ cmd_signature() {
     fi
 
     echo -e "${BLUE}==> Extracting signature with apksigner...${NC}"
-    signature_output=$("$apksigner" verify --print-certs "$apk_path" 2>&1)
+    signature_output=$("$apksigner" verify --print-certs --min-sdk-version 21 "$apk_path" 2>&1)
 
     echo "$signature_output" | grep -v '^WARNING:' | while IFS= read -r line; do
         if echo "$line" | grep -q 'SHA-256'; then
             echo -e "${GREEN}${BOLD}${line}${NC}"
+        elif echo "$line" | grep -q 'SHA-1'; then
+            echo -e "${YELLOW}${BOLD}${line}${NC}"
         else
             echo "$line"
         fi

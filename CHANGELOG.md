@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2025-12-23
+
+### Added
+- Interactive UI for signature command when no arguments provided
+  - Lists foreground apps from all connected devices with device information
+  - Lists all APK files in current directory
+  - Uses arrow keys and number keys for quick selection
+  - Supports multiple devices simultaneously
+
+### Changed
+- signature command now provides interactive selection by default
+- Improved user experience with device-specific app signature checking
+- Enhanced detect_foreground_package() function to accept optional device_id parameter
+- Interactive UI now supports scrolling window for long lists
+  - Automatically handles items exceeding terminal height
+  - SIGWINCH signal handler for instant response to terminal resize
+  - Scroll indicator showing current position (e.g., "Showing 5-15 / 30")
+  - Always displays item count and selection status
+  - Multi-select mode shows selected count (e.g., "3 item(s) | 2 selected")
+  - Alternate screen buffer prevents mixing with terminal history
+  - Graceful degradation for very small terminals (< 8 lines)
+
 ## [1.0.3] - 2025-12-22
 
 ### Fixed

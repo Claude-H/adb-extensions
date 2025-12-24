@@ -1,5 +1,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](https://github.com/luminousvault/adb-extensions)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/luminousvault/adb-extensions)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20WSL-lightgrey.svg)
 ![Shell Script](https://img.shields.io/badge/shell_script-%23121011.svg?style=flat&logo=gnu-bash&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
@@ -130,9 +130,14 @@ ak permissions [package]
 ak signature [package|apk_file]
 
 # 예시
-ak signature com.example.app    # 설치된 앱 확인
-ak signature app.apk            # 로컬 APK 파일 확인
+ak signature                   # 인터렉티브 선택 (포그라운드 앱 + APK 파일)
+ak signature com.example.app   # 설치된 앱 확인
+ak signature app.apk           # 로컬 APK 파일 확인
 ```
+
+인터렉티브 모드 표시 내용:
+- 연결된 모든 디바이스의 포그라운드 앱 (디바이스 정보 포함)
+- 현재 폴더의 모든 APK 파일
 
 **activities** - 액티비티 스택 표시
 

@@ -191,16 +191,8 @@ jobs:
           body: |
             ## ADB Extensions Kit (ak) v${{ steps.version.outputs.version }}
 
-            ### Changes
-
             ${{ steps.changelog.outputs.content }}
 
-            ### Installation
-
-            ```bash
-            brew tap luminousvault/adb-extensions
-            brew install ak
-            ```
           files: |
             adb-extensions-v${{ steps.version.outputs.version }}.tar.gz
           draft: false

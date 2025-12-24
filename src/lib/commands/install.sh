@@ -169,15 +169,14 @@ select_apk_files() {
 
   # '-l' 옵션 사용되었을 경우 최신 APK 파일 선택
   if [ $opt_l_used -eq 1 ]; then
-    latest_apk=$(find . -maxdepth 1 -type f -name "*.apk" -print0 | xargs -0 ls -t 2>/dev/null | head -n 1)
-    [ -n "$latest_apk" ] && apk_files+=("$latest_apk")
+    get_apk_list "." "time-newest"
+    [ ${#APK_LIST[@]} -gt 0 ] && apk_files+=("${APK_LIST[0]}")
   fi
 
   # '-a' 옵션 사용되었을 경우 모든 APK 파일 선택
   if [ $opt_a_used -eq 1 ]; then
-    while IFS= read -r -d '' file; do
-      apk_files+=("$file")
-    done < <(find . -maxdepth 1 -type f -name "*.apk" -print0)
+    get_apk_list "." ""
+    apk_files+=("${APK_LIST[@]}")
   fi
 
   # 옵션 없음 또는 -p 옵션 + 인자 있음 → APK 파일 또는 디렉토리 인자 확인
@@ -210,9 +209,8 @@ validate_and_collect_apk_files() {
       # 디렉토리 발견 - 해당 디렉토리의 APK 수집
       has_directories=true
 
-      while IFS= read -r -d '' file; do
-        apk_list+=("$file")
-      done < <(find "$arg" -maxdepth 1 -type f -name "*.apk" -print0)
+      get_apk_list "$arg" ""
+      apk_list+=("${APK_LIST[@]}")
 
     elif [ -f "$arg" ] && [[ "$arg" == *.apk ]]; then
       # APK 파일 발견
@@ -289,10 +287,8 @@ validate_and_collect_apk_files() {
 # APK 인터랙티브 선택
 select_apk_interactively() {
   echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
-  local apk_list=()
-  while IFS= read -r -d '' file; do
-    apk_list+=("$file")
-  done < <(find . -maxdepth 1 -type f -name "*.apk" -print0)
+  get_apk_list "." ""
+  local apk_list=("${APK_LIST[@]}")
 
   # 현재 폴더에 APK 파일이 없는 경우 에러 출력 후 종료
   if [ ${#apk_list[@]} -eq 0 ]; then
@@ -339,7 +335,7 @@ select_apk_interactively() {
     display_list+=("$(basename "$apk")")
   done
   
-  select_interactive "multi" "📱 Select APK files to install" "${display_list[@]}"
+  select_interactive "multi" "Select APK files to install" "${display_list[@]}"
 
   # 선택된 인덱스를 사용하여 원본 경로 매핑
   selected_apks=()

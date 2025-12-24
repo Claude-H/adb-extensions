@@ -1,5 +1,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](https://github.com/luminousvault/adb-extensions)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/luminousvault/adb-extensions)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20WSL-lightgrey.svg)
 ![Shell Script](https://img.shields.io/badge/shell_script-%23121011.svg?style=flat&logo=gnu-bash&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
@@ -130,9 +130,14 @@ ak permissions [package]
 ak signature [package|apk_file]
 
 # Examples
-ak signature com.example.app    # Check installed app
-ak signature app.apk            # Check local APK file
+ak signature                   # Interactive selection (foreground apps + APK files)
+ak signature com.example.app   # Check installed app
+ak signature app.apk           # Check local APK file
 ```
+
+Interactive mode displays:
+- Foreground apps from all connected devices with device info
+- All APK files in current directory
 
 **activities** - Display activity stack
 

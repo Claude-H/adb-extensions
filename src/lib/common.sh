@@ -58,8 +58,10 @@ show_version() {
 # ─────────────────────────────────────────────────────
 
 # 현재 포그라운드 앱의 패키지명을 ADB를 통해 추출
+# 인자: [device_id] - 선택적. 지정하지 않으면 G_SELECTED_DEVICE 사용
 detect_foreground_package() {
-    adb -s "$G_SELECTED_DEVICE" shell dumpsys activity activities | grep -i Hist | head -n 1 | sed -n 's/.* u0 \([^\/ ]*\)\/.*/\1/p'
+    local target_device="${1:-$G_SELECTED_DEVICE}"
+    adb -s "$target_device" shell dumpsys activity activities | grep -i Hist | head -n 1 | sed -n 's/.* u0 \([^\/ ]*\)\/.*/\1/p'
 }
 
 # 패키지 이름 형식이 유효한지 확인
@@ -256,4 +258,80 @@ contains() {
         fi
     done
     return 1
+}
+
+# ─────────────────────────────────────────────────────
+# APK 파일 관리
+# ─────────────────────────────────────────────────────
+
+# 지정한 디렉토리에서 APK 파일 목록을 가져옵니다.
+# 결과는 전역 배열 APK_LIST에 저장됩니다.
+#
+# 사용법: get_apk_list [directory_path] [sort_option]
+#
+# 인자:
+#   directory_path - APK 파일을 검색할 디렉토리 (기본값: ".")
+#   sort_option    - 정렬 방식 (기본값: "name")
+#                    - "name" 또는 빈 값: 이름순 정방향 (A-Z)
+#                    - "name-reverse": 이름순 역방향 (Z-A)
+#                    - "time-newest": 시간순 최신순
+#                    - "time-oldest": 시간순 오래된순
+#
+# 반환:
+#   APK_LIST - 전역 배열에 APK 파일 경로 목록 저장
+#   반환값 0: 성공, 1: APK 파일 없음
+#
+# 예시:
+#   get_apk_list "." "name"
+#   get_apk_list "/path/to/dir" "time-newest"
+#
+get_apk_list() {
+    local dir_path="${1:-.}"
+    local sort_option="${2:-name}"
+    
+    # 전역 배열 초기화
+    APK_LIST=()
+    
+    # 디렉토리 존재 확인
+    if [ ! -d "$dir_path" ]; then
+        return 1
+    fi
+    
+    # 정렬 방식에 따라 find 명령 구성
+    case "$sort_option" in
+        "name"|"")
+            # 이름순 정방향 (기본)
+            while IFS= read -r -d '' file; do
+                APK_LIST+=("$file")
+            done < <(find "$dir_path" -maxdepth 1 -type f -name "*.apk" -print0 | sort -z)
+            ;;
+        "name-reverse")
+            # 이름순 역방향
+            while IFS= read -r -d '' file; do
+                APK_LIST+=("$file")
+            done < <(find "$dir_path" -maxdepth 1 -type f -name "*.apk" -print0 | sort -zr)
+            ;;
+        "time-newest")
+            # 시간순 최신순
+            while IFS= read -r -d '' file; do
+                APK_LIST+=("$file")
+            done < <(find "$dir_path" -maxdepth 1 -type f -name "*.apk" -print0 | xargs -0 ls -t 2>/dev/null | tr '\n' '\0')
+            ;;
+        "time-oldest")
+            # 시간순 오래된순
+            while IFS= read -r -d '' file; do
+                APK_LIST+=("$file")
+            done < <(find "$dir_path" -maxdepth 1 -type f -name "*.apk" -print0 | xargs -0 ls -tr 2>/dev/null | tr '\n' '\0')
+            ;;
+        *)
+            # 알 수 없는 정렬 옵션 - 기본값 사용
+            while IFS= read -r -d '' file; do
+                APK_LIST+=("$file")
+            done < <(find "$dir_path" -maxdepth 1 -type f -name "*.apk" -print0 | sort -z)
+            ;;
+    esac
+    
+    # 결과가 있으면 0, 없으면 1 반환
+    [ ${#APK_LIST[@]} -gt 0 ]
+    return $?
 }

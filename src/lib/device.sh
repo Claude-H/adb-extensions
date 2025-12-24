@@ -7,10 +7,10 @@
 #@@BUILD_EXCLUDE_END
 
 # 디바이스 정보 출력 함수
-# CPU 정보 포함 여부를 옵션으로 처리
+# 표시 레벨: minimal(브랜드 모델명) | short(+ID) | normal(+Android/API) | full(+CPU)
 pretty_device() {
     local device_id="$1"
-    local include_cpu="${2:-false}"  # 기본값 false
+    local level="${2:-normal}"  # 기본값 normal
     local props brand model version api cpu
     local device_status
 
@@ -24,16 +24,27 @@ pretty_device() {
     props=$(adb -s "$device_id" shell getprop)
 
     brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
+    # 변경 후: bash 3.2 호환 (awk 사용)
+    brand=$(echo "$brand" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
     model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
     version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
     api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
 
-    if [ "$include_cpu" = "true" ]; then
-        cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
-        echo "$brand $model ($device_id) Android $version, API $api, CPU $cpu"
-    else
-        echo "$brand $model ($device_id) Android $version, API $api"
-    fi
+    case "$level" in
+        minimal)
+            echo "$brand $model"
+            ;;
+        short)
+            echo "$brand $model ($device_id)"
+            ;;
+        full)
+            cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
+            echo "$brand $model ($device_id) Android $version, API $api, CPU $cpu"
+            ;;
+        *)  # normal (default)
+            echo "$brand $model ($device_id) Android $version, API $api"
+            ;;
+    esac
 }
 
 # ─────────────────────────────────────────────────────
@@ -167,6 +178,8 @@ find_and_list_devices() {
                 props=$(adb -s "$device_id" shell getprop 2>/dev/null)
                 
                 brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
+                # 변경 후: bash 3.2 호환 (awk 사용)
+                brand=$(echo "$brand" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
                 model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
                 cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
                 version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
