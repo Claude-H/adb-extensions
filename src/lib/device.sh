@@ -84,8 +84,8 @@ present_device_selection_single() {
       formatted_devices+=("$(pretty_device $device_info)")
     done
     
-    # 인터랙티브 단일 선택 실행
-    select_interactive "single" "Select a device" "${formatted_devices[@]}"
+    # 인터랙티브 단일 선택 실행 (필터 비활성화)
+    select_interactive "single:nofilter" "Select a device" "${formatted_devices[@]}"
     
     # 선택된 인덱스를 사용하여 실제 디바이스 ID 설정
     G_SELECTED_DEVICE="${device_list[$SELECTED_INDEX]}"
@@ -134,8 +134,8 @@ present_device_selection_multi() {
       formatted_devices+=("$(pretty_device $device_info)")
     done
     
-    # 인터랙티브 멀티 선택 실행
-    select_interactive "multi" "Select devices for installation" "${formatted_devices[@]}"
+    # 인터랙티브 멀티 선택 실행 (필터 비활성화)
+    select_interactive "multi:nofilter" "Select devices for installation" "${formatted_devices[@]}"
     
     # 선택된 인덱스를 사용하여 실제 디바이스 ID 배열 생성
     selected_device=()

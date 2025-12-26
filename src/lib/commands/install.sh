@@ -287,7 +287,7 @@ validate_and_collect_apk_files() {
 # APK 인터랙티브 선택
 select_apk_interactively() {
   echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
-  get_apk_list "." ""
+  get_apk_list "." ""time-newest""
   local apk_list=("${APK_LIST[@]}")
 
   # 현재 폴더에 APK 파일이 없는 경우 에러 출력 후 종료
