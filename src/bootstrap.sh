@@ -19,6 +19,7 @@ fi
 
 # 필수 라이브러리 로드
 source "${LIB_DIR}/common.sh"
+source "${LIB_DIR}/filter.sh"
 source "${LIB_DIR}/ui.sh"
 source "${LIB_DIR}/device.sh"
 

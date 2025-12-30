@@ -287,14 +287,21 @@ merge_modules() {
   remove_build_excludes "${SRC_DIR}/lib/common.sh" >> "$output"
   echo "" >> "$output"
   
-  # 4. lib/ui.sh
+  # 4. lib/filter.sh
+  echo "# ═══════════════════════════════════════════════════" >> "$output"
+  echo "# Filtering Functions" >> "$output"
+  echo "# ═══════════════════════════════════════════════════" >> "$output"
+  remove_build_excludes "${SRC_DIR}/lib/filter.sh" >> "$output"
+  echo "" >> "$output"
+  
+  # 5. lib/ui.sh
   echo "# ═══════════════════════════════════════════════════" >> "$output"
   echo "# Interactive UI" >> "$output"
   echo "# ═══════════════════════════════════════════════════" >> "$output"
   remove_build_excludes "${SRC_DIR}/lib/ui.sh" >> "$output"
   echo "" >> "$output"
   
-  # 5. lib/device.sh
+  # 6. lib/device.sh
   echo "# ═══════════════════════════════════════════════════" >> "$output"
   echo "# Device Management" >> "$output"
   echo "# ═══════════════════════════════════════════════════" >> "$output"
