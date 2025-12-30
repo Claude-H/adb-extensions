@@ -115,6 +115,12 @@ select_interactive() {
 
   tput civis # 커서 숨김
   
+  # 소문자 변환 사전 계산 (성능 최적화: 1회만 변환)
+  declare -a items_lower=()
+  for item in "${items[@]}"; do
+    items_lower+=("$(printf '%s' "$item" | tr '[:upper:]' '[:lower:]')")
+  done
+  
   # 초기 필터 적용 (전체 항목)
   apply_filter
   
