@@ -23,6 +23,9 @@ select_interactive() {
   # Alternate screen 진입 (이전 터미널 히스토리와 완전 분리)
   tput smcup
   
+  # Bracketed Paste Mode 활성화 (붙여넣기 감지용)
+  printf '\e[?2004h'
+  
   # 디버그 로그 시작
   debug_log "=== select_interactive START ==="
   debug_log "mode_arg=$1, prompt=$2, item_count=${#}"
@@ -93,6 +96,7 @@ select_interactive() {
     fi
     tput cnorm
     stty "$old_stty"
+    printf '\e[?2004l'  # Bracketed Paste Mode 비활성화
     tput rmcup  # alternate screen 종료 (이전 화면 복원)
   }
   
@@ -105,7 +109,7 @@ select_interactive() {
     fi
     tput cnorm
     stty "$old_stty"
-    # tput rmcup 생략 → UI 내용이 터미널에 남음
+    printf '\e[?2004l'  # Bracketed Paste Mode 비활성화
     printf '\n'  # 프롬프트와 구분
     exit 130  # Ctrl+C 표준 exit code
   }
@@ -560,6 +564,43 @@ select_interactive() {
         elif [[ $seq == "[F" ]]; then # End 키
           filter_cursor=${#filter_text}
           render_filter_box_only
+        elif [[ $seq == "[2" ]]; then # Bracketed Paste 시퀀스 시작 가능성
+          # [200~ 인지 확인
+          IFS= read -rsn3 paste_check
+          if [[ $paste_check == "00~" ]]; then
+            # Bracketed Paste Mode: 붙여넣기 시작
+            debug_log "Paste mode detected, reading until \\e[201~"
+            local pasted_text=""
+            local paste_buffer=""
+            
+            # [201~ 시퀀스가 나올 때까지 모든 문자 읽기
+            while true; do
+              IFS= read -rsn1 char
+              paste_buffer+="$char"
+              
+              # 버퍼의 마지막 5글자가 [201~ 인지 확인
+              local buffer_len=${#paste_buffer}
+              if [ $buffer_len -ge 5 ]; then
+                local last_five="${paste_buffer:$((buffer_len - 5)):5}"
+                if [[ $last_five == "[201~" ]]; then
+                  # 종료 시퀀스 발견: 앞의 \e 제거하고 [201~ 제거
+                  pasted_text="${paste_buffer:0:$((buffer_len - 6))}"
+                  break
+                fi
+              fi
+            done
+            
+            debug_log "Pasted text length: ${#pasted_text}"
+            # 커서 위치에 붙여넣은 텍스트 삽입
+            filter_text="${filter_text:0:$filter_cursor}${pasted_text}${filter_text:$filter_cursor}"
+            filter_cursor=$((filter_cursor + ${#pasted_text}))
+            # 한 번만 필터링 수행
+            apply_filter
+            need_full_render=1
+          else
+            # [2 다음이 00~가 아니면 무시 (알 수 없는 시퀀스)
+            debug_log "Unknown sequence: ESC[2${paste_check}"
+          fi
         elif [[ $seq == "[3" ]]; then # Delete 키 시퀀스 시작
           IFS= read -rsn1 # ~ 읽기
           if [ $filter_cursor -lt ${#filter_text} ]; then
