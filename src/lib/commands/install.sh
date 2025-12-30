@@ -175,7 +175,7 @@ select_apk_files() {
 
   # '-a' 옵션 사용되었을 경우 모든 APK 파일 선택
   if [ $opt_a_used -eq 1 ]; then
-    get_apk_list "." ""
+    get_apk_list "." "time-newest"
     apk_files+=("${APK_LIST[@]}")
   fi
 
@@ -209,7 +209,7 @@ validate_and_collect_apk_files() {
       # 디렉토리 발견 - 해당 디렉토리의 APK 수집
       has_directories=true
 
-      get_apk_list "$arg" ""
+      get_apk_list "$arg" "time-newest"
       apk_list+=("${APK_LIST[@]}")
 
     elif [ -f "$arg" ] && [[ "$arg" == *.apk ]]; then
@@ -287,7 +287,7 @@ validate_and_collect_apk_files() {
 # APK 인터랙티브 선택
 select_apk_interactively() {
   echo -e "${BARROW} ${BOLD}Scanning APK files in the current directory...${NC}"
-  get_apk_list "." ""time-newest""
+  get_apk_list "." "time-newest"
   local apk_list=("${APK_LIST[@]}")
 
   # 현재 폴더에 APK 파일이 없는 경우 에러 출력 후 종료

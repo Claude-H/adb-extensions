@@ -17,12 +17,7 @@ debug_init
 # 결과:
 #   Single - SELECTED_ITEM, SELECTED_INDEX
 #   Multi - SELECTED_ITEMS[], SELECTED_INDICES[]
-select_interactive() {
-
-  
-  # Alternate screen 진입 (이전 터미널 히스토리와 완전 분리)
-  tput smcup
-  
+select_interactive() {  
   # Bracketed Paste Mode 활성화 (붙여넣기 감지용)
   printf '\e[?2004h'
   
@@ -50,8 +45,10 @@ select_interactive() {
   # 모드와 필터 옵션 파싱
   local mode="${mode_arg%%:*}"        # single 또는 multi
   local enable_filter=1               # 기본값: 활성화
+  local enable_sort=1                 # 기본값: 활성화 (filter와 연동)
   if [[ "$mode_arg" == *":nofilter"* ]]; then
     enable_filter=0
+    enable_sort=0  # 필터 비활성화 시 sort도 비활성화
   fi
   
   # nocasematch 설정 저장 및 활성화 (필터링 성능 최적화)
@@ -79,6 +76,25 @@ select_interactive() {
   declare -a display_items=()     # 화면에 표시할 항목 (필터 적용)
   declare -a highlighted_items=() # 하이라이트 적용된 항목 (사전 계산)
   
+  # 소문자 변환 사전 계산 (성능 최적화: 1회만 변환)
+  declare -a items_lower=()
+  for item in "${items[@]}"; do
+    items_lower+=("$(printf '%s' "$item" | tr '[:upper:]' '[:lower:]')")
+  done
+  
+  # Sort 모드 관련 변수
+  local sort_mode=1            # 0: none(원본), 1: time-newest, 2: name (기본: 최신순)
+  declare -a original_order=() # 원본 순서 저장 (인덱스 매핑용)
+  declare -a initial_items=()        # 초기 원본 저장
+  declare -a initial_items_lower=()  # 초기 원본 (소문자)
+  
+  # 초기 원본 복사 (items_lower 생성 후에 해야 함)
+  for ((i=0; i<item_count; i++)); do
+    original_order+=("$i")
+    initial_items+=("${items[$i]}")
+    initial_items_lower+=("${items_lower[$i]}")
+  done
+  
   # 터미널 크기 변경 감지용 플래그
   TERM_RESIZED=0
   trap 'TERM_RESIZED=1' WINCH
@@ -87,17 +103,18 @@ select_interactive() {
   local last_render_line=0
   
   # 안전한 종료를 위한 함수들
-  # 정상 종료 (선택 완료): 화면 복원 후 return
+  # 정상 종료 (선택 완료): UI 내용 유지하고 다음 출력 준비
   restore_terminal() {
     trap - WINCH INT TERM
     # 커서를 마지막 렌더링 위치로 이동 (모든 UI 내용 보존)
     if [ $last_render_line -gt 0 ]; then
       tput cup $last_render_line 0
     fi
+    # 다음 줄로 이동하여 다음 출력과 구분
+    printf '\n'
     tput cnorm
     stty "$old_stty"
     printf '\e[?2004l'  # Bracketed Paste Mode 비활성화
-    tput rmcup  # alternate screen 종료 (이전 화면 복원)
   }
   
   # 중단 (Ctrl+C): UI 내용 유지하고 프로그램 종료
@@ -119,11 +136,110 @@ select_interactive() {
 
   tput civis # 커서 숨김
   
-  # 소문자 변환 사전 계산 (성능 최적화: 1회만 변환)
-  declare -a items_lower=()
-  for item in "${items[@]}"; do
-    items_lower+=("$(printf '%s' "$item" | tr '[:upper:]' '[:lower:]')")
-  done
+  # UI 레이아웃 상수 정의 (라인 계산용)
+  local HEADER_LINES=2        # 헤더 + 빈줄
+  local COUNTER_LINES=1       # 카운터 정보
+  local HELP_LINES=1          # 도움말 (1줄)
+  local FILTER_BOX_LINES=4    # 필터박스 (상단선 + 입력줄 + 하단선 + 여백)
+  local ITEM_SPACING_LINES=1  # 항목과 헬퍼 사이 빈줄
+  
+  # ═══════════════════════════════════════════════════
+  # Sort 함수
+  # ═══════════════════════════════════════════════════
+  
+  # 정렬 함수: sort_mode에 따라 items 배열 재정렬
+  apply_sort() {
+    debug_log "apply_sort START: sort_mode=$sort_mode"
+    
+    if [ $sort_mode -eq 0 ]; then
+      # none: 초기 원본으로 복원
+      debug_log "Sort mode: none (restoring initial order)"
+      items=("${initial_items[@]}")
+      items_lower=("${initial_items_lower[@]}")
+      # original_order는 [0,1,2,...] 그대로 유지
+      for ((i=0; i<item_count; i++)); do
+        original_order[$i]=$i
+      done
+      # selection_status도 원본 순서로 복원 (멀티 모드)
+      if [ "$mode" = "multi" ]; then
+        declare -a new_selection_status=()
+        for ((i=0; i<item_count; i++)); do
+          # original_order가 [0,1,2,...]이므로 초기 순서 그대로
+          new_selection_status+=(${selection_status[$i]})
+        done
+        selection_status=("${new_selection_status[@]}")
+      fi
+      return 0
+      
+    elif [ $sort_mode -eq 1 ]; then
+      # time-newest: 초기 원본이 이미 time-newest라고 가정하고 복원
+      # (install.sh에서 time-newest로 가져옴)
+      debug_log "Sort mode: time-newest (restoring initial order)"
+      items=("${initial_items[@]}")
+      items_lower=("${initial_items_lower[@]}")
+      # original_order는 [0,1,2,...] 그대로 유지
+      for ((i=0; i<item_count; i++)); do
+        original_order[$i]=$i
+      done
+      # selection_status도 원본 순서로 복원 (멀티 모드)
+      if [ "$mode" = "multi" ]; then
+        # 현재 selection_status의 원본 인덱스 매핑을 역으로 복원
+        declare -a temp_status=("${selection_status[@]}")
+        declare -a new_selection_status=()
+        for ((i=0; i<item_count; i++)); do
+          new_selection_status+=("0")
+        done
+        # 현재 표시 순서의 selection_status를 원본 인덱스로 복원
+        for ((i=0; i<item_count; i++)); do
+          local orig_idx="${original_order[$i]}"
+          new_selection_status[$orig_idx]="${temp_status[$i]}"
+        done
+        selection_status=("${new_selection_status[@]}")
+      fi
+      return 0
+      
+    elif [ $sort_mode -eq 2 ]; then
+      # name: 초기 원본에서 이름순 정렬
+      debug_log "Sort mode: name (sorting alphabetically)"
+      
+      # 초기 원본에서 정렬
+      declare -a temp_items=()
+      for ((i=0; i<item_count; i++)); do
+        temp_items+=("$i|${initial_items[$i]}")
+      done
+      
+      local sorted_array
+      IFS=$'\n' read -r -d '' -a sorted_array < <(printf '%s\n' "${temp_items[@]}" | sort -t'|' -k2 && printf '\0')
+      unset IFS
+      
+      # 정렬된 순서로 재구성
+      declare -a new_items=()
+      declare -a new_items_lower=()
+      declare -a new_original_order=()
+      
+      for entry in "${sorted_array[@]}"; do
+        local idx="${entry%%|*}"
+        new_items+=("${initial_items[$idx]}")
+        new_items_lower+=("${initial_items_lower[$idx]}")
+        new_original_order+=("$idx")  # 원본 인덱스 추적
+      done
+      
+      items=("${new_items[@]}")
+      items_lower=("${new_items_lower[@]}")
+      original_order=("${new_original_order[@]}")
+      
+      # selection_status 재구성 (멀티 모드)
+      if [ "$mode" = "multi" ]; then
+        declare -a new_selection_status=()
+        for idx in "${original_order[@]}"; do
+          new_selection_status+=(${selection_status[$idx]})
+        done
+        selection_status=("${new_selection_status[@]}")
+      fi
+    fi
+    
+    debug_log "apply_sort END"
+  }
   
   # 초기 필터 적용 (전체 항목)
   apply_filter
@@ -190,8 +306,8 @@ select_interactive() {
   # 필터 박스만 부분 업데이트 (커서 이동 시, 고정 라인 위치)
   render_filter_box_only() {
     if [ $filter_mode -eq 1 ]; then
-      # 필터박스 위치: 헤더(2) + 카운터(1) + 아이템공간(max_visible_items) + 헬퍼(2)
-      local filter_line=$((3 + max_visible_items + 2))
+      # 필터박스 위치: 헤더 + 카운터 + 아이템공간 + 헬퍼
+      local filter_line=$((HEADER_LINES + COUNTER_LINES + max_visible_items + HELP_LINES))
       debug_log "filter_box_only position: line=$filter_line, max_visible=$max_visible_items"
       
       tput cup $filter_line 0
@@ -225,42 +341,42 @@ select_interactive() {
   
   # 도움말 렌더링 함수
   render_help() {
+    local pipe="${DIM}│${NC}"
+    
     if [ $filter_mode -eq 1 ]; then
+      # 필터 모드: 1줄만 표시
       if [ "$mode" = "multi" ]; then
-        echo -e "\033[K${DIM}↑/↓: Move  Tab: Toggle  Enter: Confirm  /: Exit filter${NC}"
+        echo -e "\033[K${DIM}${CYAN}↑↓${NC}:move ${pipe} ${CYAN}Enter${NC}:confirm ${pipe} ${CYAN}Tab${NC}:toggle ${pipe} ${CYAN}/${NC}:exit filter ${pipe} ${CYAN}^C${NC}:exit${NC}"
       else
-        echo -e "\033[K${DIM}↑/↓: Move  Enter: Confirm  /: Exit filter${NC}"
+        echo -e "\033[K${DIM}${CYAN}↑↓${NC}:move ${pipe} ${CYAN}Enter${NC}:select ${pipe} ${CYAN}/${NC}:exit filter ${pipe} ${CYAN}^C${NC}:exit${NC}"
       fi
     else
+      # 일반 모드: 1줄 표시
+      local help_text="${DIM}${CYAN}↑↓${NC}:move ${pipe} "
+      
       if [ "$mode" = "multi" ]; then
-        if [ $item_count -le 9 ]; then
-          if [ $enable_filter -eq 1 ]; then
-            echo -e "\033[K${DIM}↑/↓: Move  1-${item_count}: Quick select  Tab/Space: Toggle  A: Toggle All  /: Filter  Enter: Confirm  Ctrl+C: Exit${NC}"
-          else
-            echo -e "\033[K${DIM}↑/↓: Move  1-${item_count}: Quick select  Tab/Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
-          fi
-        else
-          if [ $enable_filter -eq 1 ]; then
-            echo -e "\033[K${DIM}↑/↓: Move  Tab/Space: Toggle  A: Toggle All  /: Filter  Enter: Confirm  Ctrl+C: Exit${NC}"
-          else
-            echo -e "\033[K${DIM}↑/↓: Move  Tab/Space: Toggle  A: Toggle All  Enter: Confirm  Ctrl+C: Exit${NC}"
-          fi
-        fi
+        help_text+="${CYAN}Enter${NC}:confirm ${pipe} ${CYAN}Tab${NC}:toggle ${pipe} ${CYAN}A${NC}:all ${pipe} "
       else
-        if [ $item_count -le 9 ]; then
-          if [ $enable_filter -eq 1 ]; then
-            echo -e "\033[K${DIM}↑/↓: Navigate  1-${item_count}: Quick select  /: Filter  Enter: Confirm  Ctrl+C: Exit${NC}"
-          else
-            echo -e "\033[K${DIM}↑/↓: Navigate  1-${item_count}: Quick select  Enter: Confirm  Ctrl+C: Exit${NC}"
-          fi
+        help_text+="${CYAN}Enter${NC}:select ${pipe} "
+      fi
+      
+      if [ $enable_sort -eq 1 ]; then
+        if [ $sort_mode -eq 0 ]; then
+          help_text+="${CYAN}S${NC}:sort ${pipe} "
+        elif [ $sort_mode -eq 1 ]; then
+          help_text+="${CYAN}S${NC}:time↓ ${pipe} "
         else
-          if [ $enable_filter -eq 1 ]; then
-            echo -e "\033[K${DIM}↑/↓: Navigate  /: Filter  Enter: Confirm  Ctrl+C: Exit${NC}"
-          else
-            echo -e "\033[K${DIM}↑/↓: Navigate  Enter: Confirm  Ctrl+C: Exit${NC}"
-          fi
+          help_text+="${CYAN}S${NC}:name↑ ${pipe} "
         fi
       fi
+      
+      if [ $enable_filter -eq 1 ]; then
+        help_text+="${CYAN}/${NC}:filter ${pipe} "
+      fi
+      
+      help_text+="${CYAN}^C${NC}:exit${NC}"
+      
+      echo -e "\033[K${help_text}"
     fi
   }
   
@@ -394,23 +510,32 @@ select_interactive() {
     printf '\033[J'  # 화면 아래 잔여 내용 지우기
     
     # 마지막 렌더링 라인 계산 (종료 시 커서 위치 조정용)
-    # 헤더(2) + 카운터(1) + 항목영역 + 패딩 + 헬퍼(1) + [필터박스(3)]
+    # 헤더(2) + 카운터(1) + 항목영역 + 패딩 + 빈줄(1) + 헬퍼(2) + [필터박스(3)]
     local visible_count=$((window_end - window_start))
-    local padding_lines=$((initial_item_count - visible_count))
-    if [ $padding_lines -lt 0 ]; then
-      padding_lines=0
-    fi
-    last_render_line=$((3 + visible_count + padding_lines + 1))
+    local padding_lines=0
+    
+    # 필터 모드에서만 패딩 계산
     if [ $filter_mode -eq 1 ]; then
+      local filtered_count=${#filtered_indices[@]}
+      if [ $filtered_count -lt $max_visible_items ]; then
+        padding_lines=$((max_visible_items - filtered_count))
+      fi
+    fi
+    
+    # 헤더(2) + 카운터(1) + 항목(visible_count) + 빈줄(1) + 패딩 + 헬퍼(2)
+    last_render_line=$((HEADER_LINES + COUNTER_LINES + visible_count + ITEM_SPACING_LINES + padding_lines + HELP_LINES))
+    
+    if [ $filter_mode -eq 1 ]; then
+      # 필터박스 3줄 추가 (상단선 + 입력줄 + 하단선, 빈줄 제외)
       last_render_line=$((last_render_line + 3))
     fi
-    debug_log "last_render_line calculated: $last_render_line"
+    debug_log "last_render_line calculated: $last_render_line (visible=$visible_count, padding=$padding_lines, filter_mode=$filter_mode)"
     debug_log "=== render_full END ==="
   }
   
   # 카운터만 부분 업데이트 함수
   render_counter_only() {
-    tput cup 2 0  # 헤더(2줄) 다음
+    tput cup $((HEADER_LINES)) 0  # 헤더 다음
     render_counter
   }
   
@@ -420,8 +545,8 @@ select_interactive() {
     local new_focus=$2
     
     # 항목 시작 라인 계산 (필터 모드와 관계없이 통일)
-    # 헤더(2) + 카운터(1) = 3
-    local items_start_line=3
+    # 헤더 + 카운터
+    local items_start_line=$((HEADER_LINES + COUNTER_LINES))
     debug_log "render_focus_change: old=$old_focus, new=$new_focus, items_start_line=$items_start_line"
     
     local filtered_count=${#filtered_indices[@]}
@@ -457,7 +582,8 @@ select_interactive() {
     
     # reserved_lines는 항상 필터 모드 기준 (최대값)으로 고정
     # 이렇게 해야 모드 전환 시 아이템 공간이 일정하고 하단 요소만 변경됨
-    local reserved_lines=9  # 헤더(2) + 카운터(1) + 헬퍼(2) + 필터박스(4)
+    local reserved_lines=$((HEADER_LINES + COUNTER_LINES + HELP_LINES + ITEM_SPACING_LINES + FILTER_BOX_LINES))
+    # = 2 + 1 + 2 + 1 + 4 = 10
     
     # #region agent log H4
     debug_log "AGENT_LOG H4: terminal_height=$terminal_height, reserved_lines=$reserved_lines, filter_mode=$filter_mode"
@@ -478,6 +604,12 @@ select_interactive() {
     debug_log "max_visible_items=$max_visible_items"
     
     local filtered_count=${#filtered_indices[@]}
+    
+    # 필터 모드: 실제 항목 수에 맞춰 제한 (불필요한 패딩 방지)
+    if [ $filter_mode -eq 1 ] && [ $filtered_count -lt $max_visible_items ]; then
+      max_visible_items=$filtered_count
+      debug_log "Filter mode: max_visible_items adjusted to $max_visible_items (filtered_count)"
+    fi
     
     # 스크롤 윈도우 범위 계산
     local window_start=0
@@ -668,7 +800,7 @@ select_interactive() {
             # 부분 렌더링: 카운터 + 현재 항목만
             render_counter_only
             # 항목 위치 계산
-            local items_start_line=3
+            local items_start_line=$((HEADER_LINES + COUNTER_LINES))
             local item_line=$((items_start_line + focused - window_start))
             tput cup $item_line 0
             render_single_item "$focused"
@@ -776,6 +908,19 @@ select_interactive() {
             need_full_render=1
           fi
           ;;
+        "s"|"S") # Sort 토글 (APK 선택 시에만, 대소문자 구분 없음)
+          if [ $enable_sort -eq 1 ]; then
+            # 2-way 토글: time(1) ↔ name(2)
+            if [ $sort_mode -eq 1 ]; then
+              sort_mode=2  # time → name
+            else
+              sort_mode=1  # name → time
+            fi
+            apply_sort
+            apply_filter  # 정렬 후 필터 재적용
+            need_full_render=1
+          fi
+          ;;
         $'\t'|' ') # Tab/Space 키 - 선택/해제 토글 (멀티 모드만)
           if [ "$mode" = "multi" ] && [ $filtered_count -gt 0 ]; then
             local original_idx=${filtered_indices[$focused]}
@@ -796,7 +941,7 @@ select_interactive() {
             # 현재 포커스 항목과 카운터만 업데이트 (부분 렌더링)
             render_counter_only
             # 항목 위치로 이동 후 렌더링
-            local items_start_line=3
+            local items_start_line=$((HEADER_LINES + COUNTER_LINES))
             local item_line=$((items_start_line + focused - window_start))
             tput cup $item_line 0
             render_single_item "$focused"
@@ -845,15 +990,19 @@ select_interactive() {
     SELECTED_ITEMS=()
     SELECTED_INDICES=()
     for idx in "${selection_order[@]}"; do
+      # idx는 현재 items 배열의 인덱스
+      # original_order[idx]가 실제 원본 인덱스
+      local orig_idx="${original_order[$idx]}"
       SELECTED_ITEMS+=("${items[$idx]}")
-      SELECTED_INDICES+=("$idx")
+      SELECTED_INDICES+=("$orig_idx")
     done
   else
     # 단일 선택: 단일 값으로 저장
     # focused는 필터링된 배열의 인덱스이므로 원본 인덱스로 변환
     if [ ${#filtered_indices[@]} -gt 0 ]; then
-      local original_idx=${filtered_indices[$focused]}
-      SELECTED_ITEM="${items[$original_idx]}"
+      local display_idx=${filtered_indices[$focused]}
+      local original_idx=${original_order[$display_idx]}
+      SELECTED_ITEM="${items[$display_idx]}"
       SELECTED_INDEX=$original_idx
     else
       # 필터링 결과가 없는 경우 (에러 케이스)
