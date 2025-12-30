@@ -2,27 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2025-12-23
+## [1.1.0] - 2025-12-30
 
 ### Added
-- Interactive UI for signature command when no arguments provided
-  - Lists foreground apps from all connected devices with device information
-  - Lists all APK files in current directory
-  - Uses arrow keys and number keys for quick selection
-  - Supports multiple devices simultaneously
+- Interactive UI for signature command
+  - Lists foreground apps from all connected devices with device info
+  - Lists APK files in current directory
+  - Arrow keys and number keys for quick selection
+  - Multi-device support
+- Filtering feature (`/` key)
+  - Real-time incremental search with highlight
+  - Case-insensitive matching
+  - Bracketed paste mode for safe clipboard input
+- Sorting feature (`S` key)
+  - Toggle between original/time-newest/name-ascending order
+  - Dynamic status display in help text
+- Debug logging system
+  - Detailed event logging with timestamps
+  - Source file and line number tracking
+
+### Improved
+- Interactive UI help text
+  - Condensed from 2 lines to 1 line with pipe separators
+  - Color-highlighted keys (cyan) for better visibility
+  - Semantic labels: "select" (single) vs "confirm" (multi)
+- Filtering performance
+  - Pre-computed lowercase transformations
+  - Optimized highlight computation
+  - Separated into dedicated `filter.sh` module
+- Scrolling window for long lists
+  - Auto-adjusts to terminal height
+  - SIGWINCH handler for instant resize response
+  - Position indicator (e.g., "Showing 5-15 / 30")
 
 ### Changed
-- signature command now provides interactive selection by default
-- Improved user experience with device-specific app signature checking
-- Enhanced detect_foreground_package() function to accept optional device_id parameter
-- Interactive UI now supports scrolling window for long lists
-  - Automatically handles items exceeding terminal height
-  - SIGWINCH signal handler for instant response to terminal resize
-  - Scroll indicator showing current position (e.g., "Showing 5-15 / 30")
-  - Always displays item count and selection status
-  - Multi-select mode shows selected count (e.g., "3 item(s) | 2 selected")
-  - Alternate screen buffer prevents mixing with terminal history
-  - Graceful degradation for very small terminals (< 8 lines)
+- `detect_foreground_package()` now accepts optional device_id parameter
+- Added `get_apk_list()` function for APK file management
+
+### Fixed
+- UI content preservation when exiting interactive mode
+  - Proper cursor positioning before alternate screen exit
+- Terminal size validation
+  - Minimum 15 lines required with clear error message
+  - Graceful degradation for small terminals
 
 ## [1.0.3] - 2025-12-22
 
