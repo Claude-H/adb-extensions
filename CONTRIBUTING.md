@@ -314,6 +314,62 @@ Use predefined color variables from `common.sh`:
 
 ## Testing
 
+### Debug Mode
+
+The project includes a comprehensive debug logging system for troubleshooting:
+
+#### Enable Debug Mode
+
+```bash
+# Enable debug logging for any command
+AK_DEBUG=1 ak <command> [options]
+
+# Examples
+AK_DEBUG=1 ak install ~/Downloads/app.apk
+AK_DEBUG=1 ak devices
+AK_DEBUG=1 ak pull com.example.app
+
+# Debug logs are written to build/debug.log
+cat build/debug.log
+
+# Real-time monitoring
+tail -f build/debug.log
+```
+
+#### Debug Log Format
+
+```
+[2025-12-30 09:07:29.123] [ui.sh:755] apply_filter START: filter_text=''
+[2025-12-30 09:07:29.456] [ui.sh:983] Padding: visible=15, initial=15, padding=0
+```
+
+Each log entry includes:
+- **Timestamp**: Millisecond precision
+- **Source**: File and line number
+- **Message**: Debug information
+
+#### What Gets Logged
+
+The debug system logs:
+- Function entry/exit points
+- Variable values at key decision points
+- UI rendering events (for interactive commands)
+- Filter and selection changes
+- Terminal size changes
+- Performance-critical calculations
+
+#### Debug Functions
+
+Use `debug_log()` in your code:
+
+```bash
+debug_log "Variable value: var=$var"
+debug_log "=== Function START ==="
+debug_log "Calculation result: x=$x, y=$y"
+```
+
+The log will only write if `AK_DEBUG=1` is set, so there's no performance impact in normal usage.
+
 ### Manual Testing
 
 Always test your changes with:

@@ -31,6 +31,43 @@ GARROW="${GREEN}==>${NC}"
 ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
 
 # ─────────────────────────────────────────────────────
+# 디버그 로그 시스템
+# ─────────────────────────────────────────────────────
+
+# 디버그 로그 설정
+# SCRIPT_DIR이 설정되어 있으면 프로젝트 루트를 찾고, 없으면 현재 디렉토리 사용
+if [ -n "$SCRIPT_DIR" ]; then
+  # build/ak 실행시: SCRIPT_DIR = .../build
+  # src/ak 실행시: SCRIPT_DIR = .../src
+  DEBUG_LOG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/build"
+else
+  DEBUG_LOG_DIR="$(pwd)/build"
+fi
+DEBUG_LOG_FILE="${DEBUG_LOG_DIR}/debug.log"
+
+# 디버그 로그 함수
+debug_log() {
+  if [ "${AK_DEBUG:-0}" = "1" ]; then
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
+    local caller_info="${BASH_SOURCE[2]##*/}:${BASH_LINENO[1]}"
+    echo "[$timestamp] [$caller_info] $*" >> "$DEBUG_LOG_FILE"
+  fi
+}
+
+# 디버그 초기화 (첫 실행시 로그 파일 초기화)
+debug_init() {
+  if [ "${AK_DEBUG:-0}" = "1" ]; then
+    mkdir -p "$DEBUG_LOG_DIR"
+    echo "=== Debug Log Started at $(date) ===" > "$DEBUG_LOG_FILE"
+    echo "AK_DEBUG=${AK_DEBUG}" >> "$DEBUG_LOG_FILE"
+    echo "SCRIPT_DIR=${SCRIPT_DIR}" >> "$DEBUG_LOG_FILE"
+    echo "DEBUG_LOG_DIR=${DEBUG_LOG_DIR}" >> "$DEBUG_LOG_FILE"
+    echo "DEBUG_LOG_FILE=${DEBUG_LOG_FILE}" >> "$DEBUG_LOG_FILE"
+    echo "" >> "$DEBUG_LOG_FILE"
+  fi
+}
+
+# ─────────────────────────────────────────────────────
 # 버전 정보 출력
 # ─────────────────────────────────────────────────────
 show_version() {
