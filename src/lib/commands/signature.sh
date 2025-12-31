@@ -63,7 +63,8 @@ select_signature_target_interactively() {
                 
                 if [ -n "$foreground_package" ] && [ "$foreground_package" != "null" ]; then
                     # 디바이스 정보 포맷팅
-                    local device_info=$(pretty_device "$device_id" "minimal")
+                    local device_info
+                    device_info=$(pretty_device "$device_id" "minimal")
                     
                     display_list+=("📱 $foreground_package ($device_info)")
                     source_types+=("device")
@@ -149,7 +150,8 @@ cmd_signature() {
     done
     
     # apksigner 필수 체크 (가장 먼저 확인)
-    local apksigner=$(find_apksigner)
+    local apksigner
+    apksigner=$(find_apksigner)
     if [ -z "$apksigner" ]; then
         echo
         echo -e "${ERROR} apksigner not found."

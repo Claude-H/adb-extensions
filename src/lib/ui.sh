@@ -4,10 +4,11 @@
 # Interactive UI
 # 인터랙티브 사용자 선택 UI 함수
 # ═══════════════════════════════════════════════════
-#@@BUILD_EXCLUDE_END
 
 # 디버그 초기화
 debug_init
+#@@BUILD_EXCLUDE_END
+
 
 # 통합 인터랙티브 선택 함수: 단일/멀티 선택 지원
 # 사용법: 
@@ -26,7 +27,8 @@ select_interactive() {
   debug_log "mode_arg=$1, prompt=$2, item_count=${#}"
   
   # 입력 에코 차단 (방향키 시퀀스가 화면에 표시되지 않도록)
-  local old_stty=$(stty -g)
+  local old_stty
+  old_stty=$(stty -g)
   stty -echo
   
   # 화면 갱신: 깔끔한 선택 UI를 위해 이전 내용 지우기
@@ -52,7 +54,8 @@ select_interactive() {
   fi
   
   # nocasematch 설정 저장 및 활성화 (필터링 성능 최적화)
-  local old_nocasematch=$(shopt -p nocasematch 2>/dev/null || echo "shopt -u nocasematch")
+  local old_nocasematch
+  old_nocasematch=$(shopt -p nocasematch 2>/dev/null || echo "shopt -u nocasematch")
   shopt -s nocasematch
   
   # 숫자 표시를 위한 자리수 계산
@@ -70,9 +73,11 @@ select_interactive() {
   # 필터 모드 관련 변수
   local filter_mode=0          # 0: 일반 모드, 1: 필터 입력 모드
   local filter_text=""         # 현재 필터 문자열
+  # shellcheck disable=SC2034  # Used in filtering logic
   local filter_text_lower=""   # 소문자 변환된 필터 텍스트 (캐시)
   local filter_cursor=0        # 필터 텍스트 내 커서 위치
   declare -a filtered_indices=()  # 필터된 항목의 원본 인덱스
+  # shellcheck disable=SC2034  # Used in filtering logic
   declare -a display_items=()     # 화면에 표시할 항목 (필터 적용)
   declare -a highlighted_items=() # 하이라이트 적용된 항목 (사전 계산)
   
@@ -249,11 +254,13 @@ select_interactive() {
   # 필터 박스 렌더링 함수
   render_filter_box() {
     if [ $filter_mode -eq 1 ]; then
-      local terminal_width=$(tput cols)
+      local terminal_width
+      terminal_width=$(tput cols)
       local line_width=$((terminal_width - 1))
       
       # 상단 라인
-      local top_line=$(printf '─%.0s' $(seq 1 $line_width))
+      local top_line
+      top_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${top_line}${NC}"
       
       # 텍스트 내용 준비
@@ -272,7 +279,8 @@ select_interactive() {
       echo -e "\033[K> ${display_text}"
       
       # 하단 라인
-      local bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
+      local bottom_line
+      bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${bottom_line}${NC}"
     fi
   }
@@ -293,11 +301,13 @@ select_interactive() {
       debug_log "filter_box_only position: line=$filter_line, visible=$visible_count, padding=$padding_lines, initial_max_visible=$initial_max_visible_items"
 
       tput cup $filter_line 0
-      local terminal_width=$(tput cols)
+      local terminal_width
+      terminal_width=$(tput cols)
       local line_width=$((terminal_width - 1))
 
       # 상단 라인
-      local top_line=$(printf '─%.0s' $(seq 1 $line_width))
+      local top_line
+      top_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${top_line}${NC}"
 
       # 텍스트 내용 준비
@@ -316,7 +326,8 @@ select_interactive() {
       echo -e "\033[K> ${display_text}"
 
       # 하단 라인
-      local bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
+      local bottom_line
+      bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${bottom_line}${NC}"
     fi
   }
@@ -423,7 +434,8 @@ select_interactive() {
       fi
     fi
     
-    local number_prefix=$(printf "%${max_digits}d. " "$number")
+    local number_prefix
+    number_prefix=$(printf "%${max_digits}d. " "$number")
     local highlighted_item="${highlighted_items[$display_idx]}"
     
     if [ $display_idx -eq $focused ]; then
@@ -562,7 +574,8 @@ select_interactive() {
     fi
     
     # 매 루프마다 터미널 높이 재측정
-    local terminal_height=$(tput lines)
+    local terminal_height
+    terminal_height=$(tput lines)
     
     # reserved_lines는 항상 필터 모드 기준 (최대값)으로 고정
     # 이렇게 해야 모드 전환 시 아이템 공간이 일정하고 하단 요소만 변경됨
@@ -814,7 +827,8 @@ select_interactive() {
       else
         # 일반 문자/숫자/특수문자 입력 (Space는 토글로 사용)
         # 출력 가능한 문자만 허용 (ASCII 33-126)
-        local char_code=$(printf '%d' "'$key")
+        local char_code
+        char_code=$(printf '%d' "'$key")
         if [ $char_code -ge 33 ] && [ $char_code -le 126 ]; then
           filter_text="${filter_text:0:$filter_cursor}${key}${filter_text:$filter_cursor}"
           ((filter_cursor++))
@@ -1001,7 +1015,9 @@ select_interactive() {
       SELECTED_INDEX=$original_idx
     else
       # 필터링 결과가 없는 경우 (에러 케이스)
+      # shellcheck disable=SC2034  # Used by caller
       SELECTED_ITEM=""
+      # shellcheck disable=SC2034  # Used by caller
       SELECTED_INDEX=-1
     fi
   fi

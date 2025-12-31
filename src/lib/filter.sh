@@ -118,6 +118,8 @@ compute_highlight() {
 }
 
 # 필터링 함수: filter_text 기반으로 항목 필터링 (Bash 3.2 호환)
+# Note: Uses variables from parent scope (item_count, items, mode, selection_status, items_lower, etc.)
+# shellcheck disable=SC2154  # Variables from parent scope
 apply_filter() {
   debug_log "apply_filter START: filter_text='$filter_text'"
   

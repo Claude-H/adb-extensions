@@ -248,10 +248,21 @@ extract_header() {
 
 # 빌드 제외 블록 제거 함수
 # shebang 라인과 모든 #@@BUILD_EXCLUDE_START ~ END 블록을 제거
+# debug_log, debug_init 호출 라인은 : (no-op)로 대체하여 빈 블록 문법 오류 방지
 # 한 파일 내에 여러 개의 BUILD_EXCLUDE 블록이 있어도 모두 제거됨
 remove_build_excludes() {
   local file="$1"
-  sed '/^#!/d; /^#@@BUILD_EXCLUDE_START$/,/^#@@BUILD_EXCLUDE_END$/d' "$file"
+  sed '
+    # shebang 제거
+    /^#!/d
+    
+    # BUILD_EXCLUDE 블록 제거 (debug_log 함수 정의 등 포함)
+    /^#@@BUILD_EXCLUDE_START$/,/^#@@BUILD_EXCLUDE_END$/d
+    
+    # debug_log 호출 라인을 : (no-op)로 대체
+    # 완전히 제거하면 빈 then/else 블록이 되어 문법 오류 발생 가능
+    s/^[[:space:]]*debug_log .*$/    : # no-op/
+  ' "$file"
 }
 
 # 빌드 디렉토리 준비
@@ -328,7 +339,8 @@ merge_modules() {
   
   chmod +x "$output"
   
-  local line_count=$(wc -l < "$output")
+  local line_count
+  line_count=$(wc -l < "$output")
   echo -e "${GREEN}✓ Created: ${output} (${line_count} lines)${NC}"
 }
 
@@ -417,7 +429,8 @@ verify_build() {
   fi
   
   # 버전 체크
-  local version=$(bash "${BUILD_DIR}/ak" --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1)
+  local version
+  version=$(bash "${BUILD_DIR}/ak" --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n 1)
   if [ "$version" = "$VERSION" ]; then
     echo -e "${GREEN}✓ Version check passed: $VERSION${NC}"
   else
@@ -434,8 +447,10 @@ show_summary() {
   echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
   
   if [ -f "${BUILD_DIR}/ak" ]; then
-    local lines=$(wc -l < "${BUILD_DIR}/ak")
-    local size=$(du -h "${BUILD_DIR}/ak" | cut -f1)
+    local lines
+    lines=$(wc -l < "${BUILD_DIR}/ak")
+    local size
+    size=$(du -h "${BUILD_DIR}/ak" | cut -f1)
     echo -e "  Shell Script: ${CYAN}${BUILD_DIR}/ak${NC} ($lines lines, $size)"
   fi
   

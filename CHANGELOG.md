@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2025-12-31
+
+### Improved
+- Code quality improvements
+  - Fixed all 61 ShellCheck lint warnings across the codebase
+  - Separated variable declarations and assignments to prevent exit code masking
+  - Added shellcheck directives for variables used across modules
+  - Enhanced code maintainability and error handling
+- Build process optimization
+  - Debug logging code automatically removed from production builds
+  - Debug functions remain available in development source files
+  - Cleaner production code without development overhead
+
 ## [1.1.2] - 2025-12-31
 
 ### Fixed

@@ -20,16 +20,21 @@ RED='\033[1;31m'     # 빨간색
 GREEN='\033[1;32m'   # 초록색
 YELLOW='\033[1;33m'  # 노란색
 BLUE='\033[1;34m'    # 파란색
+# shellcheck disable=SC2034  # Used in other modules after build
 PURPLE='\033[1;35m'  # 보라색
 CYAN='\033[1;36m'    # 볼드와 옥색
 BOLD='\033[1m'       # 볼드
+# shellcheck disable=SC2034  # Used in other modules after build
 DIM='\033[2m'        # 흐리게
 NC='\033[0m'         # 색상 없음
 
+# shellcheck disable=SC2034  # Used in other modules after build
 BARROW="${BLUE}==>${NC}"
+# shellcheck disable=SC2034  # Used in other modules after build
 GARROW="${GREEN}==>${NC}"
 ERROR="${RED}==>${NC} ${BOLD}Error:${NC}"
 
+#@@BUILD_EXCLUDE_START
 # ─────────────────────────────────────────────────────
 # 디버그 로그 시스템
 # ─────────────────────────────────────────────────────
@@ -48,7 +53,8 @@ DEBUG_LOG_FILE="${DEBUG_LOG_DIR}/debug.log"
 # 디버그 로그 함수
 debug_log() {
   if [ "${AK_DEBUG:-0}" = "1" ]; then
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N')
     local caller_info="${BASH_SOURCE[2]##*/}:${BASH_LINENO[1]}"
     echo "[$timestamp] [$caller_info] $*" >> "$DEBUG_LOG_FILE"
   fi
@@ -66,13 +72,16 @@ debug_init() {
     echo "" >> "$DEBUG_LOG_FILE"
   fi
 }
+#@@BUILD_EXCLUDE_END
 
 # ─────────────────────────────────────────────────────
 # 버전 정보 출력
 # ─────────────────────────────────────────────────────
 show_version() {
-  local script_name=$(basename "$0")
-  local adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
+  local script_name
+  script_name=$(basename "$0")
+  local adb_version
+  adb_version=$(adb version 2>/dev/null | head -n 1 | awk '{print $5}' || echo "Not found")
   
   echo
   echo -e "                                        ${BOLD}${script_name}${NC} ${GREEN}${VERSION}${NC} - Released on ${RELEASE_DATE}"
@@ -200,7 +209,8 @@ detect_android_home() {
   # 주의: brew install android-platform-tools로 ADB만 설치된 경우
   # (예: /opt/homebrew/bin/adb)는 build-tools가 없으므로 SDK root로 인정하지 않음
   # 이 경우 aapt/apksigner 기능을 사용할 수 없음
-  local adb_path=$(which adb 2>/dev/null)
+  local adb_path
+  adb_path=$(which adb 2>/dev/null)
   if [ -n "$adb_path" ]; then
     # realpath로 심볼릭 링크 추적
     if command -v realpath >/dev/null 2>&1; then
@@ -209,9 +219,11 @@ detect_android_home() {
     
     # adb가 platform-tools 디렉토리에 있는 경우만 SDK root로 추론
     # (예: $ANDROID_HOME/platform-tools/adb 형태)
-    local parent_dir=$(dirname "$adb_path")
+    local parent_dir
+    parent_dir=$(dirname "$adb_path")
     if [[ "$(basename "$parent_dir")" == "platform-tools" ]]; then
-      local candidate=$(dirname "$parent_dir")
+      local candidate
+      candidate=$(dirname "$parent_dir")
       # build-tools가 실제로 존재하고 비어있지 않은지 확인
       if [ -d "$candidate/build-tools" ] && [ -n "$(ls -A "$candidate/build-tools" 2>/dev/null)" ]; then
         sdk_root="$candidate"
@@ -255,7 +267,8 @@ find_android_tool() {
   fi
   
   # Android SDK 찾기
-  local android_home=$(detect_android_home)
+  local android_home
+  android_home=$(detect_android_home)
   if [ -z "$android_home" ]; then
     return 1
   fi
@@ -266,7 +279,8 @@ find_android_tool() {
   fi
   
   # 최신 버전 찾기 (버전 정렬)
-  local latest_version=$(ls -1 "$build_tools_dir" | sort -V | tail -n1)
+  local latest_version
+  latest_version=$(ls -1 "$build_tools_dir" | sort -V | tail -n1)
   if [ -z "$latest_version" ]; then
     return 1
   fi
