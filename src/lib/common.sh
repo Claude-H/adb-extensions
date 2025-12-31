@@ -129,26 +129,36 @@ validate_package_or_exit() {
     fi
 }
 
-# 지정한 패키지의 base.apk 경로를 추출하여 반환합니다. 실패 시 1을 반환
-get_apk_path() {
+# 지정한 패키지의 APK 경로를 디바이스에서 추출하여 반환합니다. 실패 시 1을 반환
+# 인자: package_name [device_id]
+#   - package_name: 패키지명 (필수)
+#   - device_id: 대상 디바이스 ID (선택, 기본값: $G_SELECTED_DEVICE)
+get_apk_path_for_package() {
     local package_name=$1
-    local apk_path
-    apk_path=$(adb -s "$G_SELECTED_DEVICE" shell pm list packages -f --user 0 | grep -x "package:.*=$package_name")
-
-    if [ -z "$apk_path" ]; then
+    local target_device="${2:-$G_SELECTED_DEVICE}"
+    local apk_paths apk_path
+    
+    # pm path로 모든 APK 경로 가져오기
+    apk_paths=$(adb -s "$target_device" shell pm path "$package_name" 2>/dev/null)
+    
+    # 패키지가 존재하지 않으면 빈 출력
+    if [ -z "$apk_paths" ]; then
         echo -e "${RED}ERROR: Package not found:${NC} $package_name"
         echo
         return 1
     fi
-
-    apk_path=$(echo "$apk_path" | sed -n 's/package:\(.*base\.apk\)=.*/\1/p')
-
+    
+    # base.apk 우선 선택 (Split APK 대응)
+    apk_path=$(echo "$apk_paths" | grep "base\.apk" | head -n 1)
+    
+    # base.apk가 없으면 첫 번째 APK 선택 (시스템 앱 대응)
     if [ -z "$apk_path" ]; then
-        echo -e "${RED}ERROR: Failed to extract APK path for package:${NC} $package_name"
-        echo
-        return 1
+        apk_path=$(echo "$apk_paths" | head -n 1)
     fi
-
+    
+    # "package:" 접두사 제거 및 공백/캐리지 리턴 제거
+    apk_path=$(echo "$apk_path" | cut -d':' -f2 | tr -d '\r\n')
+    
     echo "$apk_path"
 }
 

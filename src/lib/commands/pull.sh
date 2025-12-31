@@ -123,7 +123,7 @@ cmd_pull() {
 
     # 패키지 경로 찾기
     local apk_path
-    apk_path=$(get_apk_path "$package_name") || exit 1
+    apk_path=$(get_apk_path_for_package "$package_name") || exit 1
     
     # APK 파일 가져오기
     adb -s "$G_SELECTED_DEVICE" pull "$apk_path" "$save_apk_file_name"

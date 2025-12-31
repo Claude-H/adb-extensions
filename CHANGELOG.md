@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2025-12-31
+
+### Changed
+- Interactive UI selection key changed from Tab to Space
+  - More intuitive key binding aligned with common UI patterns
+  - Updated help text to reflect new key binding
+
+### Improved
+- APK path extraction function (`get_apk_path` → `get_apk_path_for_package`)
+  - Renamed for clarity: explicitly indicates package-to-APK-path resolution
+  - Switched from `pm list packages -f` to `pm path` for better reliability
+
+### Fixed
+- Filter mode rendering bug when moving cursor left/right during search
+  - Cursor position now properly maintained during filter input
+- Filter box position not fixed during search in filter mode
+  - Filter box now remains stable at its designated position
+- Signature extraction failure on certain APKs with different signing schemes
+  - Implemented automatic fallback mechanism for apksigner verify
+  - First attempts without options (compatible with v2/v3 signature APKs)
+  - Retries with --min-sdk-version 21 if signature info not extracted (compatible with legacy MD5 signature APKs)
+  - Supports both modern and legacy APK signing methods
+
 ## [1.1.0] - 2025-12-30
 
 ### Added
