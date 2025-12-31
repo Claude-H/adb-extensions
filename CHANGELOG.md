@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2025-12-31
+
+### Fixed
+- Multi-selection state preserved correctly after sorting
+  - Fixed incorrect index mapping when toggling sort order
+  - Selection status now properly maintained across sort mode changes
+- Display numbers now show sequential order (1, 2, 3...) after sorting
+  - Fixed display index calculation to reflect current sort order
+  - Previously showed original indices causing non-sequential numbering
+
 ## [1.1.1] - 2025-12-31
 
 ### Changed

@@ -160,15 +160,7 @@ select_interactive() {
       for ((i=0; i<item_count; i++)); do
         original_order[$i]=$i
       done
-      # selection_status도 원본 순서로 복원 (멀티 모드)
-      if [ "$mode" = "multi" ]; then
-        declare -a new_selection_status=()
-        for ((i=0; i<item_count; i++)); do
-          # original_order가 [0,1,2,...]이므로 초기 순서 그대로
-          new_selection_status+=(${selection_status[$i]})
-        done
-        selection_status=("${new_selection_status[@]}")
-      fi
+      # selection_status는 초기 원본 인덱스 기준이므로 변경하지 않음
       return 0
       
     elif [ $sort_mode -eq 1 ]; then
@@ -181,21 +173,7 @@ select_interactive() {
       for ((i=0; i<item_count; i++)); do
         original_order[$i]=$i
       done
-      # selection_status도 원본 순서로 복원 (멀티 모드)
-      if [ "$mode" = "multi" ]; then
-        # 현재 selection_status의 원본 인덱스 매핑을 역으로 복원
-        declare -a temp_status=("${selection_status[@]}")
-        declare -a new_selection_status=()
-        for ((i=0; i<item_count; i++)); do
-          new_selection_status+=("0")
-        done
-        # 현재 표시 순서의 selection_status를 원본 인덱스로 복원
-        for ((i=0; i<item_count; i++)); do
-          local orig_idx="${original_order[$i]}"
-          new_selection_status[$orig_idx]="${temp_status[$i]}"
-        done
-        selection_status=("${new_selection_status[@]}")
-      fi
+      # selection_status는 초기 원본 인덱스 기준이므로 변경하지 않음
       return 0
       
     elif [ $sort_mode -eq 2 ]; then
@@ -228,14 +206,7 @@ select_interactive() {
       items_lower=("${new_items_lower[@]}")
       original_order=("${new_original_order[@]}")
       
-      # selection_status 재구성 (멀티 모드)
-      if [ "$mode" = "multi" ]; then
-        declare -a new_selection_status=()
-        for idx in "${original_order[@]}"; do
-          new_selection_status+=(${selection_status[$idx]})
-        done
-        selection_status=("${new_selection_status[@]}")
-      fi
+      # selection_status는 초기 원본 인덱스 기준이므로 변경하지 않음
     fi
     
     debug_log "apply_sort END"
@@ -438,8 +409,10 @@ select_interactive() {
   # 단일 항목 렌더링 함수
   render_single_item() {
     local display_idx=$1
-    local original_idx=${filtered_indices[$display_idx]}
-    local number=$((original_idx + 1))
+    local items_idx=${filtered_indices[$display_idx]}
+    local original_idx=${original_order[$items_idx]}  # 초기 원본 인덱스로 변환
+    
+    local number=$((display_idx + 1))  # 화면 표시 번호는 현재 표시 순서
     local checkbox=""
     
     if [ "$mode" = "multi" ]; then
@@ -800,7 +773,8 @@ select_interactive() {
 
           # 아무것도 선택하지 않았으면 현재 포커스된 항목 선택
           if [ $selected_count -eq 0 ]; then
-            local original_idx=${filtered_indices[$focused]}
+            local items_idx=${filtered_indices[$focused]}
+            local original_idx=${original_order[$items_idx]}  # 초기 원본 인덱스로 변환
             selection_status[$original_idx]=1
             selection_order+=("$original_idx")
           fi
@@ -809,7 +783,8 @@ select_interactive() {
       elif [[ $key == " " ]]; then
         # Space 키 - 선택/해제 토글 (멀티 모드만, 필터 모드에서)
         if [ "$mode" = "multi" ] && [ $filtered_count -gt 0 ]; then
-          local original_idx=${filtered_indices[$focused]}
+          local items_idx=${filtered_indices[$focused]}
+          local original_idx=${original_order[$items_idx]}  # 초기 원본 인덱스로 변환
           if [ ${selection_status[$original_idx]} -eq 0 ]; then
             # 선택 (Toggle ON)
             selection_status[$original_idx]=1
@@ -884,7 +859,8 @@ select_interactive() {
 
             # 아무것도 선택하지 않았으면 현재 포커스된 항목 선택
             if [ $selected_count -eq 0 ]; then
-              local original_idx=${filtered_indices[$focused]}
+              local items_idx=${filtered_indices[$focused]}
+              local original_idx=${original_order[$items_idx]}  # 초기 원본 인덱스로 변환
               selection_status[$original_idx]=1
               selection_order+=("$original_idx")
             fi
@@ -940,7 +916,9 @@ select_interactive() {
           ;;
         " ") # Space 키 - 선택/해제 토글 (멀티 모드만)
           if [ "$mode" = "multi" ] && [ $filtered_count -gt 0 ]; then
-            local original_idx=${filtered_indices[$focused]}
+            local items_idx=${filtered_indices[$focused]}
+            local original_idx=${original_order[$items_idx]}  # 초기 원본 인덱스로 변환
+            
             if [ ${selection_status[$original_idx]} -eq 0 ]; then
               selection_status[$original_idx]=1
               selection_order+=("$original_idx")
