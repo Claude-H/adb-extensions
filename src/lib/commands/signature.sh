@@ -239,12 +239,7 @@ cmd_signature() {
         local device_to_use="${target_device:-$G_SELECTED_DEVICE}"
         
         tmp_apk="tmp_signature_${input_param}.apk"
-        apk_path=$(adb -s "$device_to_use" shell pm path "$input_param" 2>/dev/null | head -n 1 | cut -d':' -f2 | tr -d '\r\n')
-        
-        if [ -z "$apk_path" ]; then
-            echo -e "${RED}ERROR: Could not determine APK path for package:${NC} $input_param"
-            exit 1
-        fi
+        apk_path=$(get_apk_path_for_package "$input_param" "$device_to_use") || exit 1
 
         echo -e "${BLUE}==> Pulling APK from device...${NC}"
         adb -s "$device_to_use" pull "$apk_path" "$tmp_apk" > /dev/null
@@ -259,7 +254,22 @@ cmd_signature() {
     fi
 
     echo -e "${BLUE}==> Extracting signature with apksigner...${NC}"
-    signature_output=$("$apksigner" verify --print-certs --min-sdk-version 21 "$apk_path" 2>&1)
+    
+    # 1차 시도: 옵션 없이 실행 (v2/v3 서명 APK 호환)
+    signature_output=$("$apksigner" verify --print-certs "$apk_path" 2>&1)
+    
+    # 스마트 fallback: 에러 타입에 따라 재시도 여부 결정
+    if echo "$signature_output" | grep -q "not supported on API Level"; then
+        # MD5/SHA1 등 레거시 알고리즘 → --min-sdk-version 21로 해결 가능
+        echo -e "${DIM}   Detected legacy signing algorithm, retrying...${NC}"
+        signature_output=$("$apksigner" verify --print-certs --min-sdk-version 21 "$apk_path" 2>&1)
+    elif echo "$signature_output" | grep -q "DOES NOT VERIFY\|ERROR"; then
+        if ! echo "$signature_output" | grep -q "Signer #1 certificate"; then
+            # 기타 에러지만 서명 정보가 없는 경우 → 한 번 더 시도
+            echo -e "${DIM}   Retrying with --min-sdk-version 21...${NC}"
+            signature_output=$("$apksigner" verify --print-certs --min-sdk-version 21 "$apk_path" 2>&1)
+        fi
+    fi
 
     echo "$signature_output" | grep -v '^WARNING:' | while IFS= read -r line; do
         if echo "$line" | grep -q 'SHA-256'; then
@@ -271,8 +281,13 @@ cmd_signature() {
         fi
     done
 
+    # DOES NOT VERIFY 경고 (서명 정보는 추출됨)
     if echo "$signature_output" | grep -q 'DOES NOT VERIFY'; then
-        echo -e "${YELLOW}WARNING: APK is not fully verifiable. It may be a pre-installed system app or missing v1 signature.${NC}"
+        if echo "$signature_output" | grep -q "Signer #1 certificate"; then
+            echo
+            echo -e "${YELLOW}Note: Signature extracted but verification failed.${NC}"
+            echo -e "${DIM}This may occur with system apps or APKs missing v1 signature.${NC}"
+        fi
     fi
 
     echo

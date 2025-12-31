@@ -255,6 +255,9 @@ select_interactive() {
   debug_log "AGENT_LOG H1: initial_item_count set to $initial_item_count"
   # #endregion
   
+  # 패딩 계산용 고정 max_visible_items (필터 모드 기준)
+  local initial_max_visible_items=0
+  
   # 렌더링 상태 추적 변수
   local prev_focused=-1          # 이전 포커스 위치
   local prev_filter_mode=-1      # 이전 필터 모드 상태
@@ -306,23 +309,31 @@ select_interactive() {
   # 필터 박스만 부분 업데이트 (커서 이동 시, 고정 라인 위치)
   render_filter_box_only() {
     if [ $filter_mode -eq 1 ]; then
-      # 필터박스 위치: 헤더 + 카운터 + 아이템공간 + 헬퍼
-      local filter_line=$((HEADER_LINES + COUNTER_LINES + max_visible_items + HELP_LINES))
-      debug_log "filter_box_only position: line=$filter_line, max_visible=$max_visible_items"
-      
+      local filtered_count=${#filtered_indices[@]}
+      local visible_count=$((window_end - window_start))
+      local padding_lines=0
+
+      if [ $filtered_count -lt $initial_max_visible_items ]; then
+        padding_lines=$((initial_max_visible_items - filtered_count))
+      fi
+
+      # 필터박스 위치: 헤더 + 카운터 + 아이템공간 + 패딩 + 헬퍼
+      local filter_line=$((HEADER_LINES + COUNTER_LINES + visible_count + ITEM_SPACING_LINES + padding_lines + HELP_LINES))
+      debug_log "filter_box_only position: line=$filter_line, visible=$visible_count, padding=$padding_lines, initial_max_visible=$initial_max_visible_items"
+
       tput cup $filter_line 0
       local terminal_width=$(tput cols)
       local line_width=$((terminal_width - 1))
-      
+
       # 상단 라인
       local top_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${top_line}${NC}"
-      
+
       # 텍스트 내용 준비
       local before_cursor="${filter_text:0:$filter_cursor}"
       local at_cursor="${filter_text:$filter_cursor:1}"
       local after_cursor="${filter_text:$((filter_cursor + 1))}"
-      
+
       # 커서 표시가 포함된 텍스트 (블록 커서 + 색상 반전)
       local display_text=""
       if [ -z "$at_cursor" ]; then
@@ -330,9 +341,9 @@ select_interactive() {
       else
         display_text="${before_cursor}"$'\033[7m'"${at_cursor}"$'\033[0m'"${after_cursor}"
       fi
-      
+
       echo -e "\033[K> ${display_text}"
-      
+
       # 하단 라인
       local bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
       echo -e "\033[K${DIM}${bottom_line}${NC}"
@@ -346,35 +357,35 @@ select_interactive() {
     if [ $filter_mode -eq 1 ]; then
       # 필터 모드: 1줄만 표시
       if [ "$mode" = "multi" ]; then
-        echo -e "\033[K${DIM}${CYAN}↑↓${NC}:move ${pipe} ${CYAN}Enter${NC}:confirm ${pipe} ${CYAN}Tab${NC}:toggle ${pipe} ${CYAN}/${NC}:exit filter ${pipe} ${CYAN}^C${NC}:exit${NC}"
+        echo -e "\033[K${DIM}${CYAN}↑↓${NC}: Move ${pipe} ${CYAN}Enter${NC}: Confirm ${pipe} ${CYAN}Space${NC}: Toggle ${pipe} ${CYAN}/${NC}: Exit filter ${pipe} ${CYAN}^C${NC}: Exit${NC}"
       else
-        echo -e "\033[K${DIM}${CYAN}↑↓${NC}:move ${pipe} ${CYAN}Enter${NC}:select ${pipe} ${CYAN}/${NC}:exit filter ${pipe} ${CYAN}^C${NC}:exit${NC}"
+        echo -e "\033[K${DIM}${CYAN}↑↓${NC}: Move ${pipe} ${CYAN}Enter${NC}: Select ${pipe} ${CYAN}/${NC}: Exit filter ${pipe} ${CYAN}^C${NC}: Exit${NC}"
       fi
     else
       # 일반 모드: 1줄 표시
-      local help_text="${DIM}${CYAN}↑↓${NC}:move ${pipe} "
+      local help_text="${DIM}${CYAN}↑↓${NC}: Move ${pipe} "
       
       if [ "$mode" = "multi" ]; then
-        help_text+="${CYAN}Enter${NC}:confirm ${pipe} ${CYAN}Tab${NC}:toggle ${pipe} ${CYAN}A${NC}:all ${pipe} "
+        help_text+="${CYAN}Enter${NC}: Confirm ${pipe} ${CYAN}Space${NC}: Toggle ${pipe} ${CYAN}A${NC}: All ${pipe} "
       else
-        help_text+="${CYAN}Enter${NC}:select ${pipe} "
+        help_text+="${CYAN}Enter${NC}: Select ${pipe} "
       fi
       
       if [ $enable_sort -eq 1 ]; then
         if [ $sort_mode -eq 0 ]; then
-          help_text+="${CYAN}S${NC}:sort ${pipe} "
+          help_text+="${CYAN}S${NC}: Sort ${pipe} "
         elif [ $sort_mode -eq 1 ]; then
-          help_text+="${CYAN}S${NC}:time↓ ${pipe} "
+          help_text+="${CYAN}S${NC}: Time↓ ${pipe} "
         else
-          help_text+="${CYAN}S${NC}:name↑ ${pipe} "
+          help_text+="${CYAN}S${NC}: Name↑ ${pipe} "
         fi
       fi
       
       if [ $enable_filter -eq 1 ]; then
-        help_text+="${CYAN}/${NC}:filter ${pipe} "
+        help_text+="${CYAN}/${NC}: Filter ${pipe} "
       fi
       
-      help_text+="${CYAN}^C${NC}:exit${NC}"
+      help_text+="${CYAN}^C${NC}: Exit${NC}"
       
       echo -e "\033[K${help_text}"
     fi
@@ -477,19 +488,19 @@ select_interactive() {
     local filtered_count=${#filtered_indices[@]}
     
     # 필터링된 항목이 화면을 가득 채우면 패딩 불필요
-    if [ $filtered_count -ge $max_visible_items ]; then
-      debug_log "Padding: skipped (filtered items >= max_visible, $filtered_count >= $max_visible_items)"
+    if [ $filtered_count -ge $initial_max_visible_items ]; then
+      debug_log "Padding: skipped (filtered items >= initial_max_visible, $filtered_count >= $initial_max_visible_items)"
       return 0
     fi
     
-    # 패딩 계산: 화면 크기 - 필터링된 항목 수
-    local padding_lines=$((max_visible_items - filtered_count))
+    # 패딩 계산: 초기 화면 크기 - 필터링된 항목 수
+    local padding_lines=$((initial_max_visible_items - filtered_count))
     
     # #region agent log H1
-    debug_log "AGENT_LOG H1: Padding calculation (filter mode) - visible_count=$visible_count, filtered_count=$filtered_count, max_visible_items=$max_visible_items, padding_lines=$padding_lines"
+    debug_log "AGENT_LOG H1: Padding calculation (filter mode) - visible_count=$visible_count, filtered_count=$filtered_count, initial_max_visible_items=$initial_max_visible_items, padding_lines=$padding_lines"
     # #endregion
     
-    debug_log "Padding: filter_mode=1, filtered=$filtered_count, max=$max_visible_items, padding=$padding_lines"
+    debug_log "Padding: filter_mode=1, filtered=$filtered_count, initial_max=$initial_max_visible_items, padding=$padding_lines"
     
     for ((i=0; i<padding_lines; i++)); do
       echo -e "\033[K"
@@ -517,12 +528,12 @@ select_interactive() {
     # 필터 모드에서만 패딩 계산
     if [ $filter_mode -eq 1 ]; then
       local filtered_count=${#filtered_indices[@]}
-      if [ $filtered_count -lt $max_visible_items ]; then
-        padding_lines=$((max_visible_items - filtered_count))
+      if [ $filtered_count -lt $initial_max_visible_items ]; then
+        padding_lines=$((initial_max_visible_items - filtered_count))
       fi
     fi
     
-    # 헤더(2) + 카운터(1) + 항목(visible_count) + 빈줄(1) + 패딩 + 헬퍼(2)
+    # 헤더(2) + 카운터(1) + 항목(visible_count) + 빈줄(1) + 패딩 + 헬퍼(1)
     last_render_line=$((HEADER_LINES + COUNTER_LINES + visible_count + ITEM_SPACING_LINES + padding_lines + HELP_LINES))
     
     if [ $filter_mode -eq 1 ]; then
@@ -583,7 +594,7 @@ select_interactive() {
     # reserved_lines는 항상 필터 모드 기준 (최대값)으로 고정
     # 이렇게 해야 모드 전환 시 아이템 공간이 일정하고 하단 요소만 변경됨
     local reserved_lines=$((HEADER_LINES + COUNTER_LINES + HELP_LINES + ITEM_SPACING_LINES + FILTER_BOX_LINES))
-    # = 2 + 1 + 2 + 1 + 4 = 10
+    # = 2 + 1 + 1 + 1 + 4 = 10
     
     # #region agent log H4
     debug_log "AGENT_LOG H4: terminal_height=$terminal_height, reserved_lines=$reserved_lines, filter_mode=$filter_mode"
@@ -595,6 +606,12 @@ select_interactive() {
     
     if [ $max_visible_items -lt 5 ]; then
       max_visible_items=5
+    fi
+    
+    # 첫 루프에서 initial_max_visible_items 설정 (패딩 계산 기준)
+    if [ $initial_max_visible_items -eq 0 ]; then
+      initial_max_visible_items=$max_visible_items
+      debug_log "initial_max_visible_items set to $initial_max_visible_items"
     fi
     
     # #region agent log H4
@@ -789,8 +806,8 @@ select_interactive() {
           fi
         fi
         break
-      elif [[ $key == $'\t' ]]; then
-        # Tab 키 - 선택/해제 토글 (멀티 모드만, 필터 모드에서)
+      elif [[ $key == " " ]]; then
+        # Space 키 - 선택/해제 토글 (멀티 모드만, 필터 모드에서)
         if [ "$mode" = "multi" ] && [ $filtered_count -gt 0 ]; then
           local original_idx=${filtered_indices[$focused]}
           if [ ${selection_status[$original_idx]} -eq 0 ]; then
@@ -820,10 +837,10 @@ select_interactive() {
           fi
         fi
       else
-        # 일반 문자/숫자/특수문자 입력
-        # 출력 가능한 문자만 허용 (ASCII 32-126)
+        # 일반 문자/숫자/특수문자 입력 (Space는 토글로 사용)
+        # 출력 가능한 문자만 허용 (ASCII 33-126)
         local char_code=$(printf '%d' "'$key")
-        if [ $char_code -ge 32 ] && [ $char_code -le 126 ]; then
+        if [ $char_code -ge 33 ] && [ $char_code -le 126 ]; then
           filter_text="${filter_text:0:$filter_cursor}${key}${filter_text:$filter_cursor}"
           ((filter_cursor++))
           apply_filter
@@ -921,7 +938,7 @@ select_interactive() {
             need_full_render=1
           fi
           ;;
-        $'\t'|' ') # Tab/Space 키 - 선택/해제 토글 (멀티 모드만)
+        " ") # Space 키 - 선택/해제 토글 (멀티 모드만)
           if [ "$mode" = "multi" ] && [ $filtered_count -gt 0 ]; then
             local original_idx=${filtered_indices[$focused]}
             if [ ${selection_status[$original_idx]} -eq 0 ]; then
