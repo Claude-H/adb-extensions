@@ -571,6 +571,9 @@ select_interactive() {
       clear
       printf '\033[3J'
       need_full_render=1
+      # 패딩 계산 기준 리셋 (필터 모드용)
+      initial_max_visible_items=0
+      debug_log "initial_max_visible_items reset for new terminal size"
     fi
     
     # 매 루프마다 터미널 높이 재측정

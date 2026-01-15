@@ -25,7 +25,7 @@ AK_COMPLETION_DESC
             '-r[Replace existing app]' \
             '-t[Allow test APKs]' \
             '-d[Allow version downgrade]' \
-            '*:APK files:compadd -a apk_files'
+            '*:APK files or directories:_files -g "*.apk(-.)" -/'
           ;;
 AK_COMPLETION
 

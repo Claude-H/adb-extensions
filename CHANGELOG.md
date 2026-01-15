@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.3] - 2025-12-31
+## [1.1.3] - 2026-01-15
 
 ### Improved
 - Code quality improvements
@@ -14,6 +14,15 @@ All notable changes to this project will be documented in this file.
   - Debug logging code automatically removed from production builds
   - Debug functions remain available in development source files
   - Cleaner production code without development overhead
+- Install command autocompletion enhanced
+  - Added directory support alongside APK file completion
+  - Allows easier navigation to APK files in subdirectories
+
+### Fixed
+- Filter mode rendering bug when terminal window is resized
+  - Fixed padding calculation to reset on terminal resize
+  - Filter box now renders at correct position after window size changes
+  - Normal mode continues to work correctly during resizing
 
 ## [1.1.2] - 2025-12-31
 
