@@ -14,6 +14,7 @@ debug_init
 # 사용법: 
 #   select_interactive "single" "프롬프트" "${array[@]}"  # 단일 선택
 #   select_interactive "multi" "프롬프트" "${array[@]}"   # 멀티 선택
+#   select_interactive "multi" "프롬프트" "location" "${array[@]}"  # location 정보 포함
 # 
 # 결과:
 #   Single - SELECTED_ITEM, SELECTED_INDEX
@@ -39,6 +40,14 @@ select_interactive() {
   local mode_arg="$1"
   local prompt="$2"
   shift 2
+  
+  # location 파라미터 확인 (옵션)
+  local location_info=""
+  if [ $# -gt 0 ] && [[ "$1" == "location:"* ]]; then
+    location_info="${1#location:}"
+    shift
+  fi
+  
   local items=("$@")
   local item_count=${#items[@]}
   local focused=0
@@ -143,8 +152,20 @@ select_interactive() {
 
   tput civis # 커서 숨김
   
+  # Location 정보 라인 수 계산 (항상 1줄로 표시)
+  local location_lines=0
+  if [ -n "$location_info" ]; then
+    location_lines=1  # "Location: ~/path • ~/path2" 1줄
+  fi
+  
   # UI 레이아웃 상수 정의 (라인 계산용)
-  local HEADER_LINES=2        # 헤더 + 빈줄
+  # HEADER_LINES = 프롬프트(1) + Location라인(1) + 빈줄(1) = 3
+  # Location이 없으면: 프롬프트(1) + 빈줄(1) = 2
+  if [ $location_lines -eq 0 ]; then
+    local HEADER_LINES=2
+  else
+    local HEADER_LINES=3
+  fi
   local COUNTER_LINES=1       # 카운터 정보
   local HELP_LINES=1          # 도움말 (1줄)
   local FILTER_BOX_LINES=3    # 필터박스 (상단선 + 입력줄 + 하단선)
@@ -242,7 +263,42 @@ select_interactive() {
   render_header() {
     tput cup 0 0
     echo -e "\033[K${BLUE}==> ${BOLD}${prompt}${NC}"
-    echo -e "\033[K"
+    
+    # Location 정보가 있으면 표시
+    if [ -n "$location_info" ]; then
+      # "location:" 접두사 제거
+      local dirs_str="${location_info#location:}"
+      # location_info를 |로 분리하여 배열로 변환
+      IFS='|' read -ra dirs <<< "$dirs_str"
+      unset IFS
+      
+      # 한 줄에 구분자로 표시
+      local location_line=""
+      if [ ${#dirs[@]} -eq 1 ]; then
+        # 단일 디렉토리
+        location_line="${dirs[0]}"
+      elif [ ${#dirs[@]} -gt 1 ]; then
+        # 여러 디렉토리 - 불릿(•)으로 구분
+        local first=true
+        for dir in "${dirs[@]}"; do
+          if [ "$first" = true ]; then
+            location_line="$dir"
+            first=false
+          else
+            location_line="${location_line} • ${dir}"
+          fi
+        done
+      fi
+
+      tput cup 1 0
+      echo -e "\033[K    ${DIM}Location: ${location_line}${NC}"
+      tput cup 2 0
+      echo -e "\033[K"
+      
+    else
+      tput cup 1 0
+      echo -e "\033[K"
+    fi
   }
   
   # 필터 박스 렌더링 함수

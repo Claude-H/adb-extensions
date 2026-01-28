@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.5] - 2026-01-28
+
+### Added
+- Location information display in APK selection UI
+  - Shows current directory or source directories when selecting APKs
+  - Multiple directories displayed with bullet (•) separator
+  - Home directory paths abbreviated with `~` for cleaner display
+
+### Improved
+- `extract_unique_directories` function for bash 3.x compatibility
+  - Replaced associative array with array iteration for older macOS systems
+  - Improved error handling for relative path conversion failures
+
 ## [1.1.4] - 2026-01-28
 
 ### Changed

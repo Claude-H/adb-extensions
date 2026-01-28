@@ -76,34 +76,40 @@ ak <command> [options] [arguments...]
 
 #### APK Management
 
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `install [apk_files\|directories...]` | Install APK files with interactive selection | `-l` (latest), `-a` (all), `-f <filter>` (filter), `-m` (all devices), `-r` (replace), `-t` (test APKs), `-d` (downgrade) |
-| `pull [package\|filename] [filename\|package]` | Extract APK from device | Order flexible |
+- `install [apk_files|directories...]` - Install APK files with interactive selection
+  - APK Selection:
+    - `-l` - Install latest APK file (from current directory or specified directory)
+    - `-a` - Install all APK files (from current directory or specified directory)
+    - `-f <filter>` - Filter APKs by pattern
+  - Device Options:
+    - `-m` - Install to all connected devices
+  - ADB Options:
+    - `-r` - Replace existing app (default)
+    - `-t` - Allow test APKs
+    - `-d` - Allow version downgrade
+- `pull [package|filename] [filename|package]` - Extract APK from device (order flexible)
 
 #### App Information
 
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `info [package]` | Display app information (version, SDK, debuggable status, installer) | Auto-detects foreground app if omitted |
-| `permissions [package]` | List granted app permissions | Auto-detects foreground app if omitted |
-| `signature [package\|apk_file]` | Display app signature (supports interactive selection) | - |
-| `activities [--all]` | Display activity stack | `--all` (all tasks) |
+**Note:** Omitting `[package]` auto-detects the foreground app.
+
+- `info [package]` - Display app information (version, SDK, debuggable status, installer)
+- `permissions [package]` - List granted app permissions
+- `signature [package|apk_file]` - Display app signature (supports interactive selection)
+- `activities [--all]` - Display activity stack (`--all` for all tasks)
 
 #### App Control
 
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `launch <package>` | Launch app (main activity) | - |
-| `kill [packages...]` | Force stop app(s) | Auto-detects foreground app if omitted |
-| `clear [packages...]` | Clear app data | Auto-detects foreground app if omitted |
-| `uninstall [package]` | Uninstall app | Auto-detects foreground app if omitted |
+**Note:** Omitting `[package]` or `[packages...]` auto-detects the foreground app.
+
+- `launch <package>` - Launch app (main activity)
+- `kill [packages...]` - Force stop app(s)
+- `clear [packages...]` - Clear app data
+- `uninstall [package]` - Uninstall app
 
 #### Device Management
 
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `devices` | List connected devices (brand, model, ID, Android version, CPU) | - |
+- `devices` - List connected devices (brand, model, ID, Android version, CPU)
 
 ### Interactive UI Features
 
@@ -150,6 +156,12 @@ ak install app.apk
 ak install -l
 ```
 
+**Install latest APK from specific directory:**
+```bash
+ak install -l /path/to/dir
+ak install /path/to/dir -l  # Same as above
+```
+
 **Install latest debug APK:**
 ```bash
 ak install -l -f debug
@@ -158,6 +170,12 @@ ak install -l -f debug
 **Install all APKs:**
 ```bash
 ak install -a
+```
+
+**Install all APKs from specific directory:**
+```bash
+ak install -a /path/to/dir
+ak install /path/to/dir -a  # Same as above
 ```
 
 **Filter:**

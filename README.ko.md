@@ -76,34 +76,40 @@ ak <command> [options] [arguments...]
 
 #### APK 관리
 
-| 명령어 | 설명 | 주요 옵션 |
-|--------|------|-----------|
-| `install [apk_files\|directories...]` | APK 파일 설치 (인터랙티브 선택 지원) | `-l` (최신), `-a` (전체), `-f <filter>` (필터), `-m` (모든 디바이스), `-r` (교체), `-t` (테스트 APK), `-d` (다운그레이드) |
-| `pull [package\|filename] [filename\|package]` | 디바이스에서 APK 추출 | 순서 무관 |
+- `install [apk_files|directories...]` - APK 파일 설치 (인터랙티브 선택 지원)
+  - APK 선택:
+    - `-l` - 최신 APK 파일 설치 (현재 디렉토리 또는 지정된 디렉토리)
+    - `-a` - 모든 APK 파일 설치 (현재 디렉토리 또는 지정된 디렉토리)
+    - `-f <filter>` - 패턴으로 APK 필터링
+  - 디바이스 옵션:
+    - `-m` - 연결된 모든 디바이스에 설치
+  - ADB 옵션:
+    - `-r` - 기존 앱 교체 (기본값)
+    - `-t` - 테스트 APK 허용
+    - `-d` - 버전 다운그레이드 허용
+- `pull [package|filename] [filename|package]` - 디바이스에서 APK 추출 (순서 무관)
 
 #### 앱 정보
 
-| 명령어 | 설명 | 주요 옵션 |
-|--------|------|-----------|
-| `info [package]` | 앱 정보 표시 (버전, SDK, 디버그 가능 여부, 설치자) | 패키지 생략 시 포그라운드 앱 자동 감지 |
-| `permissions [package]` | 허용된 앱 권한 목록 | 패키지 생략 시 포그라운드 앱 자동 감지 |
-| `signature [package\|apk_file]` | 앱 서명 표시 (인터랙티브 선택 지원) | - |
-| `activities [--all]` | 액티비티 스택 표시 | `--all` (모든 태스크) |
+**참고:** `[package]`를 생략하면 포그라운드 앱을 자동으로 감지합니다.
+
+- `info [package]` - 앱 정보 표시 (버전, SDK, 디버그 가능 여부, 설치자)
+- `permissions [package]` - 허용된 앱 권한 목록
+- `signature [package|apk_file]` - 앱 서명 표시 (인터랙티브 선택 지원)
+- `activities [--all]` - 액티비티 스택 표시 (`--all` 모든 태스크)
 
 #### 앱 제어
 
-| 명령어 | 설명 | 주요 옵션 |
-|--------|------|-----------|
-| `launch <package>` | 앱 실행 (메인 액티비티) | - |
-| `kill [packages...]` | 앱 강제 종료 | 패키지 생략 시 포그라운드 앱 자동 감지 |
-| `clear [packages...]` | 앱 데이터 삭제 | 패키지 생략 시 포그라운드 앱 자동 감지 |
-| `uninstall [package]` | 앱 제거 | 패키지 생략 시 포그라운드 앱 자동 감지 |
+**참고:** `[package]` 또는 `[packages...]`를 생략하면 포그라운드 앱을 자동으로 감지합니다.
+
+- `launch <package>` - 앱 실행 (메인 액티비티)
+- `kill [packages...]` - 앱 강제 종료
+- `clear [packages...]` - 앱 데이터 삭제
+- `uninstall [package]` - 앱 제거
 
 #### 디바이스 관리
 
-| 명령어 | 설명 | 주요 옵션 |
-|--------|------|-----------|
-| `devices` | 연결된 디바이스 목록 (브랜드, 모델, ID, Android 버전, CPU) | - |
+- `devices` - 연결된 디바이스 목록 (브랜드, 모델, ID, Android 버전, CPU)
 
 ### 인터랙티브 UI 기능
 
@@ -150,6 +156,12 @@ ak install app.apk
 ak install -l
 ```
 
+**특정 디렉토리에서 최신 APK 설치:**
+```bash
+ak install -l /path/to/dir
+ak install /path/to/dir -l  # 위와 동일
+```
+
 **최신 디버그 APK 설치:**
 ```bash
 ak install -l -f debug
@@ -158,6 +170,12 @@ ak install -l -f debug
 **모든 APK 설치:**
 ```bash
 ak install -a
+```
+
+**특정 디렉토리에서 모든 APK 설치:**
+```bash
+ak install -a /path/to/dir
+ak install /path/to/dir -a  # 위와 동일
 ```
 
 **필터링:**

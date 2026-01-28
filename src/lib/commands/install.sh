@@ -41,8 +41,8 @@ show_help_install() {
   echo -e "  (none)\tSelect APK files interactively from the current directory (default)."
   echo -e "  <directories>\tSelect APK files interactively from the specified directories."
   echo -e "  <apk files>\tDirectly specify APK files to install."
-  echo -e "  -l\t\tInstall the latest APK file from the current directory."
-  echo -e "  -a\t\tInstall all APK files from the current directory."
+  echo -e "  -l\t\tInstall the latest APK file (from current directory or specified directory)."
+  echo -e "  -a\t\tInstall all APK files (from current directory or specified directory)."
   echo -e "  -f <filter>\tFilter and select APK files matching the filter interactively."
   echo -e "\t\t\tFilter is REQUIRED. Can be used with directory."
   echo -e "\t\t\tExamples:"
@@ -72,6 +72,8 @@ initialize_install_variables() {
   opt_f_used=0
   filter=""
   install_positional_args=()
+  USER_SPECIFIED_DIRECTORIES=()
+  USER_SPECIFIED_INVALID_PATHS=()
 }
 
 # 옵션 파싱 (수동 파싱으로 옵션과 위치 인자를 구조적으로 분리)
@@ -205,16 +207,32 @@ select_apk_files() {
     # 인자가 있으면 아래에서 validate_and_collect_apk_files로 처리됨
   fi
 
-  # '-l' 옵션 사용되었을 경우 최신 APK 파일 선택
-  if [ $opt_l_used -eq 1 ]; then
-    get_apk_list "." "time-newest"
-    [ ${#APK_LIST[@]} -gt 0 ] && apk_files+=("${APK_LIST[0]}")
-  fi
-
-  # '-a' 옵션 사용되었을 경우 모든 APK 파일 선택
-  if [ $opt_a_used -eq 1 ]; then
-    get_apk_list "." "time-newest"
-    apk_files+=("${APK_LIST[@]}")
+  # '-l', '-a' 옵션 공통 처리
+  if [ $opt_l_used -eq 1 ] || [ $opt_a_used -eq 1 ]; then
+    local target_dir="."  # 기본값: 현재 디렉토리
+    
+    # 위치 인자에서 디렉토리 찾기 (첫 번째 디렉토리만 사용)
+    for arg in "$@"; do
+      if [ -d "$arg" ]; then
+        target_dir="$arg"
+        # 사용자 지정 디렉토리 추적
+        USER_SPECIFIED_DIRECTORIES=("$target_dir")
+        break
+      fi
+    done
+    
+    # APK 목록 가져오기 (한 번만 호출)
+    get_apk_list "$target_dir" "time-newest"
+    
+    if [ ${#APK_LIST[@]} -gt 0 ]; then
+      if [ $opt_l_used -eq 1 ]; then
+        # -l: 첫 번째만
+        apk_files+=("${APK_LIST[0]}")
+      elif [ $opt_a_used -eq 1 ]; then
+        # -a: 모두
+        apk_files+=("${APK_LIST[@]}")
+      fi
+    fi
   fi
 
   # 옵션 없음 또는 -f 옵션 + 인자 있음 → APK 파일 또는 디렉토리 인자 확인
@@ -241,19 +259,39 @@ validate_and_collect_apk_files() {
   local has_apk_files=false
   local apk_list=()
 
+  # 전역 변수 초기화
+  USER_SPECIFIED_DIRECTORIES=()
+  USER_SPECIFIED_INVALID_PATHS=()
+
   # 1단계: 모든 인자를 검사하여 디렉토리와 APK 파일을 분류
   for arg in "$@"; do
-    if [ -d "$arg" ]; then
+    # 존재하지 않는 경로 체크
+    if [ ! -e "$arg" ]; then
+      # 존재하지 않는 경로 - 경고 메시지 표시하되 계속 진행
+      USER_SPECIFIED_INVALID_PATHS+=("$arg")
+      continue
+    fi
+
+    # 파일인 경우
+    if [ -f "$arg" ]; then
+      # APK 파일인지 확인
+      if [[ "$arg" == *.apk ]]; then
+        # APK 파일 발견
+        has_apk_files=true
+        apk_list+=("$arg")
+      else
+        # APK가 아닌 파일 - 에러 메시지 표시 후 종료
+        echo -e "${ERROR} Invalid file detected: '$arg'. Only APK files are allowed."
+        exit 1
+      fi
+    # 디렉토리인 경우
+    elif [ -d "$arg" ]; then
       # 디렉토리 발견 - 해당 디렉토리의 APK 수집
       has_directories=true
+      USER_SPECIFIED_DIRECTORIES+=("$arg")
 
       get_apk_list "$arg" "time-newest"
       apk_list+=("${APK_LIST[@]}")
-
-    elif [ -f "$arg" ] && [[ "$arg" == *.apk ]]; then
-      # APK 파일 발견
-      has_apk_files=true
-      apk_list+=("$arg")
     fi
   done
 
@@ -311,8 +349,82 @@ validate_and_collect_apk_files() {
       display_list+=("$(basename "$apk")")
     done
     
+    # 경로 정보 추출 - 사용자 지정 디렉토리 목록 사용
+    local location_param=""
+    local formatted_dirs=()
+    
+    # 존재하는 디렉토리 처리
+    for dir in "${USER_SPECIFIED_DIRECTORIES[@]}"; do
+      local formatted_dir="$dir"
+      
+      # 절대 경로로 변환
+      if [[ "$formatted_dir" != /* ]]; then
+        # 상대 경로인 경우 절대 경로로 변환
+        local abs_dir
+        abs_dir=$(cd "$formatted_dir" 2>/dev/null && pwd)
+        if [ -n "$abs_dir" ]; then
+          formatted_dir="$abs_dir"
+        fi
+      fi
+      
+      # 홈 디렉토리 축약
+      if [[ "$formatted_dir" == "$HOME"* ]]; then
+        formatted_dir="${formatted_dir/#$HOME/~}"
+      fi
+      
+      # 해당 디렉토리의 APK 개수 확인
+      get_apk_list "$dir" "time-newest"
+      local apk_count=${#APK_LIST[@]}
+      
+      # APK가 없는 경우 "(empty)" 표시 추가
+      if [ $apk_count -eq 0 ]; then
+        formatted_dir="${formatted_dir} (empty)"
+      fi
+      
+      formatted_dirs+=("$formatted_dir")
+    done
+    
+    # 존재하지 않는 경로 처리
+    for invalid_path in "${USER_SPECIFIED_INVALID_PATHS[@]}"; do
+      local formatted_path="$invalid_path"
+      
+      # ~로 시작하는 경로를 홈 디렉토리로 확장
+      if [[ "$formatted_path" == ~/* ]] || [[ "$formatted_path" == ~ ]]; then
+        formatted_path="${formatted_path/#\~/$HOME}"
+      fi
+      
+      # 절대 경로로 변환 시도
+      if [[ "$formatted_path" != /* ]]; then
+        # 상대 경로인 경우 절대 경로로 변환 시도
+        local abs_path
+        abs_path=$(cd "$(dirname "$formatted_path")" 2>/dev/null && pwd)/$(basename "$formatted_path")
+        if [ -n "$abs_path" ] && [[ "$abs_path" == /* ]]; then
+          formatted_path="$abs_path"
+        fi
+      fi
+      
+      # 홈 디렉토리 축약
+      if [[ "$formatted_path" == "$HOME"* ]]; then
+        formatted_path="${formatted_path/#$HOME/~}"
+      fi
+      
+      formatted_path="${formatted_path} (not found)"
+      formatted_dirs+=("$formatted_path")
+    done
+    
+    # location 파라미터 생성
+    if [ ${#formatted_dirs[@]} -gt 0 ]; then
+      IFS='|'
+      location_param="location:${formatted_dirs[*]}"
+      unset IFS
+    fi
+    
     echo -e "${BARROW} ${BOLD}Select APK files to install${NC}\n"
-    select_interactive "multi" "Select APK files" "${display_list[@]}"
+    if [ -n "$location_param" ]; then
+      select_interactive "multi" "Select APK files" "$location_param" "${display_list[@]}"
+    else
+      select_interactive "multi" "Select APK files" "${display_list[@]}"
+    fi
     
     # 선택된 인덱스를 사용하여 원본 경로 매핑
     apk_files=()
@@ -373,7 +485,16 @@ select_apk_interactively() {
     display_list+=("$(basename "$apk")")
   done
   
-  select_interactive "multi" "Select APK files to install" "${display_list[@]}"
+  # 현재 디렉토리 경로 정보 추출
+  local current_dir
+  current_dir=$(pwd)
+  # 홈 디렉토리 축약
+  if [[ "$current_dir" == "$HOME"* ]]; then
+    current_dir="${current_dir/#$HOME/~}"
+  fi
+  local location_param="location:${current_dir}"
+  
+  select_interactive "multi" "Select APK files to install" "$location_param" "${display_list[@]}"
 
   # 선택된 인덱스를 사용하여 원본 경로 매핑
   selected_apks=()
