@@ -26,10 +26,10 @@ select_interactive() {
   debug_log "=== select_interactive START ==="
   debug_log "mode_arg=$1, prompt=$2, item_count=${#}"
   
-  # 입력 에코 차단 (방향키 시퀀스가 화면에 표시되지 않도록)
+  # 입력 에코 차단 및 SIGINT(Ctrl+C) 비활성화 (직접 처리)
   local old_stty
   old_stty=$(stty -g)
-  stty -echo
+  stty -echo intr undef
   
   # 화면 갱신: 깔끔한 선택 UI를 위해 이전 내용 지우기
   clear
@@ -106,38 +106,40 @@ select_interactive() {
   
   # 마지막 렌더링 라인 추적 (종료 시 커서 위치 조정용)
   local last_render_line=0
+  local help_msg_line=0      # 도움말 메시지 라인 위치
+  local fixed_list_height=0  # 필터 모드 시 리스트 영역 높이 고정용
   
   # 안전한 종료를 위한 함수들
   # 정상 종료 (선택 완료): UI 내용 유지하고 다음 출력 준비
   restore_terminal() {
-    trap - WINCH INT TERM
+    trap - WINCH TERM
     # 커서를 마지막 렌더링 위치로 이동 (모든 UI 내용 보존)
     if [ $last_render_line -gt 0 ]; then
-      tput cup $last_render_line 0
+      tput cup $((last_render_line + 1)) 0
     fi
-    # 다음 줄로 이동하여 다음 출력과 구분
-    printf '\n'
+    # 다음 줄로 이동하여 다음 출력과 구분 (tput cup으로 이미 이동했으므로 개행 제거)
     tput cnorm
     stty "$old_stty"
     printf '\e[?2004l'  # Bracketed Paste Mode 비활성화
   }
   
-  # 중단 (Ctrl+C): UI 내용 유지하고 프로그램 종료
+  # 중단 (SIGTERM): UI 내용 유지하고 프로그램 종료
+  # SIGINT(Ctrl+C)는 read 루프에서 직접 처리
   interrupt_handler() {
-    trap - WINCH INT TERM
+    trap - WINCH TERM
     # 커서를 마지막 렌더링 위치로 이동 (모든 UI 내용 보존)
     if [ $last_render_line -gt 0 ]; then
-      tput cup $last_render_line 0
+      tput cup $((last_render_line + 1)) 0
     fi
     tput cnorm
     stty "$old_stty"
     printf '\e[?2004l'  # Bracketed Paste Mode 비활성화
-    printf '\n'  # 프롬프트와 구분
+    # printf '\n'  # 프롬프트와 구분 (tput cup으로 이미 이동했으므로 제거)
     exit 130  # Ctrl+C 표준 exit code
   }
   
-  # Ctrl+C만 trap (EXIT는 제거)
-  trap interrupt_handler INT TERM
+  # SIGTERM만 trap (SIGINT는 stty로 비활성화 후 키 입력으로 처리)
+  trap interrupt_handler TERM
 
   tput civis # 커서 숨김
   
@@ -145,7 +147,7 @@ select_interactive() {
   local HEADER_LINES=2        # 헤더 + 빈줄
   local COUNTER_LINES=1       # 카운터 정보
   local HELP_LINES=1          # 도움말 (1줄)
-  local FILTER_BOX_LINES=4    # 필터박스 (상단선 + 입력줄 + 하단선 + 여백)
+  local FILTER_BOX_LINES=3    # 필터박스 (상단선 + 입력줄 + 하단선)
   local ITEM_SPACING_LINES=1  # 항목과 헬퍼 사이 빈줄
   
   # ═══════════════════════════════════════════════════
@@ -224,15 +226,7 @@ select_interactive() {
   debug_log "AGENT_LOG H2: After apply_filter - filtered_indices count=${#filtered_indices[@]}, item_count=$item_count"
   # #endregion
   
-  # 초기 항목 수 저장 (패딩 계산 기준)
-  local initial_item_count=${#filtered_indices[@]}
-  
-  # #region agent log H1
-  debug_log "AGENT_LOG H1: initial_item_count set to $initial_item_count"
-  # #endregion
-  
-  # 패딩 계산용 고정 max_visible_items (필터 모드 기준)
-  local initial_max_visible_items=0
+
   
   # 렌더링 상태 추적 변수
   local prev_focused=-1          # 이전 포커스 위치
@@ -290,31 +284,20 @@ select_interactive() {
     if [ $filter_mode -eq 1 ]; then
       local filtered_count=${#filtered_indices[@]}
       local visible_count=$((window_end - window_start))
-      local padding_lines=0
-
-      if [ $filtered_count -lt $initial_max_visible_items ]; then
-        padding_lines=$((initial_max_visible_items - filtered_count))
-      fi
-
-      # 필터박스 위치: 헤더 + 카운터 + 아이템공간 + 패딩 + 헬퍼
-      local filter_line=$((HEADER_LINES + COUNTER_LINES + visible_count + ITEM_SPACING_LINES + padding_lines + HELP_LINES))
-      debug_log "filter_box_only position: line=$filter_line, visible=$visible_count, padding=$padding_lines, initial_max_visible=$initial_max_visible_items"
-
+      
+      # 필터박스 위치: 헤더 + 카운터 + 아이템영역(고정높이) + 아이템과 헬퍼 사이 빈줄 + 헬퍼
+      local filter_line=$((HEADER_LINES + COUNTER_LINES + fixed_list_height + ITEM_SPACING_LINES + HELP_LINES))
+      
       tput cup $filter_line 0
       local terminal_width
       terminal_width=$(tput cols)
       local line_width=$((terminal_width - 1))
 
-      # 상단 라인
-      local top_line
-      top_line=$(printf '─%.0s' $(seq 1 $line_width))
-      echo -e "\033[K${DIM}${top_line}${NC}"
-
       # 텍스트 내용 준비
       local before_cursor="${filter_text:0:$filter_cursor}"
       local at_cursor="${filter_text:$filter_cursor:1}"
       local after_cursor="${filter_text:$((filter_cursor + 1))}"
-
+      
       # 커서 표시가 포함된 텍스트 (블록 커서 + 색상 반전)
       local display_text=""
       if [ -z "$at_cursor" ]; then
@@ -322,13 +305,10 @@ select_interactive() {
       else
         display_text="${before_cursor}"$'\033[7m'"${at_cursor}"$'\033[0m'"${after_cursor}"
       fi
-
+      
       echo -e "\033[K> ${display_text}"
-
-      # 하단 라인
-      local bottom_line
-      bottom_line=$(printf '─%.0s' $(seq 1 $line_width))
-      echo -e "\033[K${DIM}${bottom_line}${NC}"
+      # Move cursor back to the input position for correct subsequent input
+      tput cup $filter_line $((2 + filter_cursor)) # 2 for "> "
     fi
   }
   
@@ -371,6 +351,12 @@ select_interactive() {
       
       echo -e "\033[K${help_text}"
     fi
+  }
+
+  # 도움말만 부분 업데이트 함수
+  render_help_only() {
+    tput cup $help_msg_line 0
+    render_help
   }
   
   # 카운터 정보 렌더링 함수
@@ -456,41 +442,21 @@ select_interactive() {
       render_single_item "$display_idx"
     done
   }
-  
-  # 공백 패딩 렌더링 함수 (하단 요소 위치 고정용)
+
+  # 패딩 렌더링 함수 (필터 모드 시 높이 고정용)
   render_padding() {
-    # #region agent log H1,H5
-    debug_log "AGENT_LOG H1,H5: render_padding called - filter_mode=$filter_mode, initial_item_count=$initial_item_count, window_start=$window_start, window_end=$window_end"
-    # #endregion
-    
-    # 필터 모드가 아니면 패딩 없음 (스크롤 모드에서는 패딩 불필요)
-    if [ $filter_mode -ne 1 ]; then
-      debug_log "Padding: skipped (not in filter mode)"
-      return 0
+    if [ $filter_mode -eq 1 ]; then
+      local visible_count=$((window_end - window_start))
+      if [ $visible_count -lt $fixed_list_height ]; then
+        local padding=$((fixed_list_height - visible_count))
+        for ((i=0; i<padding; i++)); do
+          echo -e "\033[K"
+        done
+      fi
     fi
-    
-    local visible_count=$((window_end - window_start))
-    local filtered_count=${#filtered_indices[@]}
-    
-    # 필터링된 항목이 화면을 가득 채우면 패딩 불필요
-    if [ $filtered_count -ge $initial_max_visible_items ]; then
-      debug_log "Padding: skipped (filtered items >= initial_max_visible, $filtered_count >= $initial_max_visible_items)"
-      return 0
-    fi
-    
-    # 패딩 계산: 초기 화면 크기 - 필터링된 항목 수
-    local padding_lines=$((initial_max_visible_items - filtered_count))
-    
-    # #region agent log H1
-    debug_log "AGENT_LOG H1: Padding calculation (filter mode) - visible_count=$visible_count, filtered_count=$filtered_count, initial_max_visible_items=$initial_max_visible_items, padding_lines=$padding_lines"
-    # #endregion
-    
-    debug_log "Padding: filter_mode=1, filtered=$filtered_count, initial_max=$initial_max_visible_items, padding=$padding_lines"
-    
-    for ((i=0; i<padding_lines; i++)); do
-      echo -e "\033[K"
-    done
   }
+  
+
   
   # 전체 화면 렌더링 함수
   render_full() {
@@ -499,33 +465,34 @@ select_interactive() {
     render_header        # 2줄 (헤더 + 빈줄)
     render_counter       # 1줄
     render_items         # 가변 (실제 표시 항목)
-    echo -e "\033[K"     # 항목과 헬퍼 사이 빈줄
-    render_padding       # 공백 패딩
-    render_help          # 2줄 (도움말 + 빈줄)
-    render_filter_box    # 필터모드시 4줄
+    render_padding       # 패딩 추가
+    echo -e "\033[K"     # 항목과 헬퍼 사이 빈줄 (ITEM_SPACING_LINES)
+    render_help          # 1줄
+    if [ $filter_mode -eq 1 ]; then
+      render_filter_box  # 3줄
+    fi
     printf '\033[J'  # 화면 아래 잔여 내용 지우기
     
     # 마지막 렌더링 라인 계산 (종료 시 커서 위치 조정용)
-    # 헤더(2) + 카운터(1) + 항목영역 + 패딩 + 빈줄(1) + 헬퍼(2) + [필터박스(3)]
+    # 헤더(2) + 카운터(1) + 항목(visible_count) + 빈줄(1) + 헬퍼(1)
     local visible_count=$((window_end - window_start))
-    local padding_lines=0
     
-    # 필터 모드에서만 패딩 계산
+    # 필터 모드일 때는 패딩을 포함한 높이(fixed_list_height)를 사용
+    local content_height=$visible_count
     if [ $filter_mode -eq 1 ]; then
-      local filtered_count=${#filtered_indices[@]}
-      if [ $filtered_count -lt $initial_max_visible_items ]; then
-        padding_lines=$((initial_max_visible_items - filtered_count))
-      fi
+        content_height=$fixed_list_height
     fi
     
-    # 헤더(2) + 카운터(1) + 항목(visible_count) + 빈줄(1) + 패딩 + 헬퍼(1)
-    last_render_line=$((HEADER_LINES + COUNTER_LINES + visible_count + ITEM_SPACING_LINES + padding_lines + HELP_LINES))
+    # 도움말 출력 라인 계산 (헤더 + 카운터 + 콘텐츠 + 빈줄)
+    help_msg_line=$((HEADER_LINES + COUNTER_LINES + content_height + ITEM_SPACING_LINES))
+
+    last_render_line=$((HEADER_LINES + COUNTER_LINES + content_height + ITEM_SPACING_LINES + HELP_LINES))
     
     if [ $filter_mode -eq 1 ]; then
-      # 필터박스 3줄 추가 (상단선 + 입력줄 + 하단선, 빈줄 제외)
-      last_render_line=$((last_render_line + 3))
+      # 필터박스 3줄 추가 (상단선 + 입력줄 + 하단선)
+      last_render_line=$((last_render_line + FILTER_BOX_LINES))
     fi
-    debug_log "last_render_line calculated: $last_render_line (visible=$visible_count, padding=$padding_lines, filter_mode=$filter_mode)"
+    debug_log "last_render_line calculated: $last_render_line (visible=$visible_count, content_height=$content_height, filter_mode=$filter_mode)"
     debug_log "=== render_full END ==="
   }
   
@@ -565,15 +532,14 @@ select_interactive() {
 
   while true; do
     # 터미널 크기 변경 플래그 확인
-    if [ $TERM_RESIZED -eq 1 ]; then
+    local is_resized=$TERM_RESIZED
+    if [ $is_resized -eq 1 ]; then
       TERM_RESIZED=0
       debug_log "Terminal resized - triggering full render"
       clear
       printf '\033[3J'
       need_full_render=1
-      # 패딩 계산 기준 리셋 (필터 모드용)
-      initial_max_visible_items=0
-      debug_log "initial_max_visible_items reset for new terminal size"
+
     fi
     
     # 매 루프마다 터미널 높이 재측정
@@ -591,17 +557,24 @@ select_interactive() {
     
     debug_log "terminal_height=$terminal_height, filter_mode=$filter_mode, reserved_lines=$reserved_lines(fixed)"
     
-    local max_visible_items=$((terminal_height - reserved_lines))
+    local max_visible_items=$((terminal_height - reserved_lines - 1))
     
-    if [ $max_visible_items -lt 5 ]; then
-      max_visible_items=5
+    if [ $max_visible_items -lt 1 ]; then
+      max_visible_items=1
     fi
     
-    # 첫 루프에서 initial_max_visible_items 설정 (패딩 계산 기준)
-    if [ $initial_max_visible_items -eq 0 ]; then
-      initial_max_visible_items=$max_visible_items
-      debug_log "initial_max_visible_items set to $initial_max_visible_items"
+    # fixed_list_height 업데이트 로직
+    # 필터 모드가 아니거나 리사이즈 되었을 때만 높이 갱신 (즉, 필터링 중에는 높이 고정)
+    if [ $filter_mode -eq 0 ] || [ $is_resized -eq 1 ]; then
+        local current_content_height=$max_visible_items
+        # 전체 아이템이 화면보다 작으면 아이템 수만큼만 높이 차지
+        if [ $item_count -lt $current_content_height ]; then
+            current_content_height=$item_count
+        fi
+        fixed_list_height=$current_content_height
     fi
+    
+
     
     # #region agent log H4
     debug_log "AGENT_LOG H4: max_visible_items calculated as $max_visible_items"
@@ -667,85 +640,100 @@ select_interactive() {
     # 키 입력 대기
     IFS= read -rsn1 key
 
+    # Ctrl+C (ASCII 3, 0x03) 처리 - 즉시 종료
+    if [[ $key == $'\x03' ]]; then
+        restore_terminal
+        exit 130
+    fi
+
     # 필터 모드와 일반 모드에 따라 키 처리 분기
     if [ $filter_mode -eq 1 ]; then
       # ===== 필터 입력 모드 =====
       
-      # ESC 시퀀스 처리 (2단계 읽기 - 타임아웃 없음으로 안정화)
+      # ESC 시퀀스 처리 (시퀀스 vs 단독 ESC)
       if [[ $key == $'\x1b' ]]; then
-        # ESC 후 [A, [B 등을 한번에 읽음 (타임아웃 없음)
-        IFS= read -rsn2 seq
-        
-        if [[ $seq == "[A" ]]; then # 위쪽 화살표
-          if [ $filtered_count -gt 0 ]; then
-            ((focused--))
-            if [ $focused -lt 0 ]; then focused=$((filtered_count - 1)); fi
-          fi
-        elif [[ $seq == "[B" ]]; then # 아래쪽 화살표
-          if [ $filtered_count -gt 0 ]; then
-            ((focused++))
-            if [ $focused -ge $filtered_count ]; then focused=0; fi
-          fi
-        elif [[ $seq == "[C" ]]; then # 오른쪽 화살표
-          if [ $filter_cursor -lt ${#filter_text} ]; then
-            ((filter_cursor++))
+        # 다음 문자를 1초 타임아웃으로 읽기 (Bash 3.2 호환)
+        # read -t 0은 일부 환경에서 동작하지 않으므로 실제 읽기를 시도함
+        if IFS= read -rsn1 -t 1 next_char; then
+          # 문자가 읽혔다면 시퀀스로 간주 (예: [)
+          # 나머지 1문자를 더 읽어서 2글자 시퀀스 완성 (예: A)
+          IFS= read -rsn1 last_char
+          seq="${next_char}${last_char}"
+          
+          if [[ $seq == "[A" ]]; then # 위쪽 화살표
+            if [ $filtered_count -gt 0 ]; then
+              ((focused--))
+              if [ $focused -lt 0 ]; then focused=$((filtered_count - 1)); fi
+            fi
+          elif [[ $seq == "[B" ]]; then # 아래쪽 화살표
+            if [ $filtered_count -gt 0 ]; then
+              ((focused++))
+              if [ $focused -ge $filtered_count ]; then focused=0; fi
+            fi
+          elif [[ $seq == "[C" ]]; then # 오른쪽 화살표
+            if [ $filter_cursor -lt ${#filter_text} ]; then
+              ((filter_cursor++))
+              render_filter_box_only
+            fi
+          elif [[ $seq == "[D" ]]; then # 왼쪽 화살표
+            if [ $filter_cursor -gt 0 ]; then
+              ((filter_cursor--))
+              render_filter_box_only
+            fi
+          elif [[ $seq == "[H" ]]; then # Home 키
+            filter_cursor=0
             render_filter_box_only
-          fi
-        elif [[ $seq == "[D" ]]; then # 왼쪽 화살표
-          if [ $filter_cursor -gt 0 ]; then
-            ((filter_cursor--))
+          elif [[ $seq == "[F" ]]; then # End 키
+            filter_cursor=${#filter_text}
             render_filter_box_only
-          fi
-        elif [[ $seq == "[H" ]]; then # Home 키
-          filter_cursor=0
-          render_filter_box_only
-        elif [[ $seq == "[F" ]]; then # End 키
-          filter_cursor=${#filter_text}
-          render_filter_box_only
-        elif [[ $seq == "[2" ]]; then # Bracketed Paste 시퀀스 시작 가능성
-          # [200~ 인지 확인
-          IFS= read -rsn3 paste_check
-          if [[ $paste_check == "00~" ]]; then
-            # Bracketed Paste Mode: 붙여넣기 시작
-            debug_log "Paste mode detected, reading until \\e[201~"
-            local pasted_text=""
-            local paste_buffer=""
-            
-            # [201~ 시퀀스가 나올 때까지 모든 문자 읽기
-            while true; do
-              IFS= read -rsn1 char
-              paste_buffer+="$char"
+          elif [[ $seq == "[2" ]]; then # Bracketed Paste 시퀀스 시작 가능성
+            # [200~ 인지 확인
+            IFS= read -rsn3 paste_check
+            if [[ $paste_check == "00~" ]]; then
+              # Bracketed Paste Mode: 붙여넣기 시작
+              debug_log "Paste mode detected, reading until \\e[201~"
+              local pasted_text=""
+              local paste_buffer=""
               
-              # 버퍼의 마지막 5글자가 [201~ 인지 확인
-              local buffer_len=${#paste_buffer}
-              if [ $buffer_len -ge 5 ]; then
-                local last_five="${paste_buffer:$((buffer_len - 5)):5}"
-                if [[ $last_five == "[201~" ]]; then
-                  # 종료 시퀀스 발견: 앞의 \e 제거하고 [201~ 제거
-                  pasted_text="${paste_buffer:0:$((buffer_len - 6))}"
-                  break
+              # [201~ 시퀀스가 나올 때까지 모든 문자 읽기
+              while true; do
+                IFS= read -rsn1 char
+                paste_buffer+="$char"
+                
+                # 버퍼의 마지막 5글자가 [201~ 인지 확인
+                local buffer_len=${#paste_buffer}
+                if [ $buffer_len -ge 5 ]; then
+                  local last_five="${paste_buffer:$((buffer_len - 5)):5}"
+                  if [[ $last_five == "[201~" ]]; then
+                    # 종료 시퀀스 발견: 앞의 \e 제거하고 [201~ 제거
+                    pasted_text="${paste_buffer:0:$((buffer_len - 6))}"
+                    break
+                  fi
                 fi
-              fi
-            done
-            
-            debug_log "Pasted text length: ${#pasted_text}"
-            # 커서 위치에 붙여넣은 텍스트 삽입
-            filter_text="${filter_text:0:$filter_cursor}${pasted_text}${filter_text:$filter_cursor}"
-            filter_cursor=$((filter_cursor + ${#pasted_text}))
-            # 한 번만 필터링 수행
-            apply_filter
-            need_full_render=1
-          else
-            # [2 다음이 00~가 아니면 무시 (알 수 없는 시퀀스)
-            debug_log "Unknown sequence: ESC[2${paste_check}"
+              done
+              
+              debug_log "Pasted text length: ${#pasted_text}"
+              # 커서 위치에 붙여넣은 텍스트 삽입
+              filter_text="${filter_text:0:$filter_cursor}${pasted_text}${filter_text:$filter_cursor}"
+              filter_cursor=$((filter_cursor + ${#pasted_text}))
+              # 한 번만 필터링 수행
+              apply_filter
+              need_full_render=1
+            else
+              # [2 다음이 00~가 아니면 무시 (알 수 없는 시퀀스)
+              debug_log "Unknown sequence: ESC[2${paste_check}"
+            fi
+          elif [[ $seq == "[3" ]]; then # Delete 키 시퀀스 시작
+            IFS= read -rsn1 # ~ 읽기
+            if [ $filter_cursor -lt ${#filter_text} ]; then
+              filter_text="${filter_text:0:$filter_cursor}${filter_text:$((filter_cursor + 1))}"
+              apply_filter
+              need_full_render=1
+            fi
           fi
-        elif [[ $seq == "[3" ]]; then # Delete 키 시퀀스 시작
-          IFS= read -rsn1 # ~ 읽기
-          if [ $filter_cursor -lt ${#filter_text} ]; then
-            filter_text="${filter_text:0:$filter_cursor}${filter_text:$((filter_cursor + 1))}"
-            apply_filter
-            need_full_render=1
-          fi
+        else
+          # 단독 ESC: 무시 (화살표 키 시퀀스가 아닌 경우)
+          :
         fi
       elif [[ $key == $'\x7f' ]] || [[ $key == $'\x08' ]]; then
         # Backspace
@@ -763,14 +751,6 @@ select_interactive() {
         # Ctrl+E: 커서를 맨 뒤로
         filter_cursor=${#filter_text}
         render_filter_box_only
-      elif [[ $key == "/" ]]; then
-        # / 키: 필터 모드 종료 (토글) 및 필터 초기화
-        debug_log "Exiting filter mode"
-        filter_text=""
-        filter_cursor=0
-        filter_mode=0
-        apply_filter  # 전체 리스트로 복원
-        need_full_render=1
       elif [[ $key == "" ]]; then
         # Enter: 필터링된 결과로 확정
         if [ $filtered_count -eq 0 ]; then
@@ -827,6 +807,14 @@ select_interactive() {
             need_full_render=1
           fi
         fi
+      elif [[ $key == "/" ]]; then
+        # '/' 키: 필터 모드 종료 및 필터 초기화
+        debug_log "Exiting filter mode (/)"
+        filter_text=""
+        filter_cursor=0
+        filter_mode=0
+        apply_filter  # 전체 리스트로 복원
+        need_full_render=1
       else
         # 일반 문자/숫자/특수문자 입력 (Space는 토글로 사용)
         # 출력 가능한 문자만 허용 (ASCII 33-126)
@@ -843,17 +831,24 @@ select_interactive() {
     else
       # ===== 일반 선택 모드 =====
       
-      # ESC 시퀀스 처리 (2단계 읽기 - 타임아웃 없음으로 안정화)
+      # ESC 시퀀스 처리 (시퀀스 vs 단독 ESC)
       if [[ $key == $'\x1b' ]]; then
-        # ESC 후 [A, [B 등을 한번에 읽음 (타임아웃 없음)
-        IFS= read -rsn2 seq
-        
-        if [[ $seq == "[A" ]]; then # 위쪽 화살표
-          ((focused--))
-          if [ $focused -lt 0 ]; then focused=$((filtered_count - 1)); fi
-        elif [[ $seq == "[B" ]]; then # 아래쪽 화살표
-          ((focused++))
-          if [ $focused -ge $filtered_count ]; then focused=0; fi
+        # 다음 문자를 1초 타임아웃으로 읽기 (Bash 3.2 호환)
+        if IFS= read -rsn1 -t 1 next_char; then
+          # 문자가 읽혔다면 시퀀스로 간주
+          IFS= read -rsn1 last_char
+          seq="${next_char}${last_char}"
+          
+          if [[ $seq == "[A" ]]; then # 위쪽 화살표
+            ((focused--))
+            if [ $focused -lt 0 ]; then focused=$((filtered_count - 1)); fi
+          elif [[ $seq == "[B" ]]; then # 아래쪽 화살표
+            ((focused++))
+            if [ $focused -ge $filtered_count ]; then focused=0; fi
+          fi
+        else
+          # 단독 ESC: 일반 모드에서는 무시
+          :
         fi
       fi
 

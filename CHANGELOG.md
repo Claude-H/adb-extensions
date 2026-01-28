@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-01-28
+
+### Changed
+- `install` command option renamed: `-p` → `-f` (filter)
+  - Changed option name from `-p` to `-f` to avoid potential conflicts
+  - Updated terminology: "pattern" → "filter" throughout codebase and documentation
+  - All examples and help text updated to reflect new option name
+
+### Improved
+- `install` command option parsing
+  - Replaced `getopts` with manual parsing to allow options anywhere in the argument list
+  - Options now work correctly even when placed after positional arguments (directories/APK files)
+  - Examples: `ak install /path/to/dir -f debug` and `ak install app.apk -m -t` now work as expected
+  - All options (`-f`, `-l`, `-a`, `-m`, `-t`, `-d`, etc.) are now position-independent
+  - Structurally separated option parsing from positional argument handling
+- Interactive UI layout and stability
+  - Filter box now appears naturally below help text instead of being pinned to the bottom
+  - Implemented height stabilization in filter mode to prevent UI "jumping" when list shrinks
+  - Added 1-line safety margin to terminal height calculations to prevent rendering breaks
+  - Improved terminal resize (SIGWINCH) handling to correctly recalculate layouts in all modes
+
+### Fixed
+- UI rendering glitches during terminal resizing and filtering
+- Incorrect padding calculation in filter mode for short lists
+- Options not recognized when placed after positional arguments in `install` command
+
 ## [1.1.3] - 2026-01-15
 
 ### Improved

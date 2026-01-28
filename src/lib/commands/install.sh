@@ -18,9 +18,9 @@ AK_COMPLETION_DESC
           apk_files=(*.apk(N-.))
           _arguments -C \
             '(- *)'{-h,--help}'[Show help for this command]' \
-            '(-a -p)-l[Install latest APK]' \
-            '(-l -p)-a[Install all APKs]' \
-            '(-l -a)-p[Filter APKs by pattern]:pattern' \
+            '(-a -f)-l[Install latest APK]' \
+            '(-l -f)-a[Install all APKs]' \
+            '(-l -a)-f[Filter APKs by filter]:filter' \
             '-m[Install on all devices]' \
             '-r[Replace existing app]' \
             '-t[Allow test APKs]' \
@@ -43,12 +43,12 @@ show_help_install() {
   echo -e "  <apk files>\tDirectly specify APK files to install."
   echo -e "  -l\t\tInstall the latest APK file from the current directory."
   echo -e "  -a\t\tInstall all APK files from the current directory."
-  echo -e "  -p <pattern>\tFilter and select APK files matching the pattern interactively."
-  echo -e "\t\t\tPattern is REQUIRED. Can be used with directory."
+  echo -e "  -f <filter>\tFilter and select APK files matching the filter interactively."
+  echo -e "\t\t\tFilter is REQUIRED. Can be used with directory."
   echo -e "\t\t\tExamples:"
-  echo -e "\t\t\t  -p debug\t\t\tFind APKs containing 'debug' in current dir"
-  echo -e "\t\t\t  -p \"myapp release\"\t\tFind APKs containing both 'myapp' and 'release'"
-  echo -e "\t\t\t  -p debug /path/to/folder\tFind APKs in specified folder"
+  echo -e "\t\t\t  -f debug\t\t\tFind APKs containing 'debug' in current dir"
+  echo -e "\t\t\t  -f \"myapp release\"\t\tFind APKs containing both 'myapp' and 'release'"
+  echo -e "\t\t\t  -f debug /path/to/folder\tFind APKs in specified folder"
   echo
   echo -e "${BOLD}Device Options:${NC}"
   echo -e "  -m\t\tInstall APK files on all connected devices."
@@ -69,49 +69,87 @@ initialize_install_variables() {
   opt_l_used=0
   opt_a_used=0
   opt_m_used=0
-  opt_p_used=0
-  filter_pattern=""
+  opt_f_used=0
+  filter=""
+  install_positional_args=()
 }
 
-# 옵션 파싱
+# 옵션 파싱 (수동 파싱으로 옵션과 위치 인자를 구조적으로 분리)
 process_install_options() {
-  while getopts ":hlamprtd" opt; do
-    case ${opt} in
-      h ) show_help_install; exit 0 ;;
-      l ) opt_l_used=1 ;;
-      a ) opt_a_used=1 ;;
-      m ) opt_m_used=1 ;;
-      p ) opt_p_used=1 ;;
-      t | d ) install_opt+=" -$opt" ;;
-      r ) ;; # '-r' 옵션은 이미 기본값으로 설정되어 있으므로 무시
-      \? ) echo "Invalid option: $OPTARG" 1>&2; exit 1 ;;
+  local i=1
+  install_positional_args=()
+  
+  while [ $i -le $# ]; do
+    local arg="${!i}"
+    
+    case "$arg" in
+      -h|--help)
+        show_help_install
+        exit 0
+        ;;
+      -f)
+        opt_f_used=1
+        ((i++))
+        # 다음 인자는 무조건 필터 문자열로 처리
+        if [ $i -gt $# ]; then
+          echo -e "${ERROR} Option -f requires a filter argument."
+          echo
+          echo -e "${BOLD}Usage:${NC} ak install -f <filter> [directory]"
+          echo -e "${BOLD}Example:${NC}"
+          echo -e "  ak install -f debug"
+          echo -e "  ak install -f \"myapp release\""
+          echo -e "  ak install -f debug /path/to/folder"
+          echo -e "  ak install /path/to/folder -f debug"
+          echo
+          echo "For interactive selection of all APKs, use: ak install"
+          exit 1
+        fi
+        filter="${!i}"
+        ;;
+      -l)
+        opt_l_used=1
+        ;;
+      -a)
+        opt_a_used=1
+        ;;
+      -m)
+        opt_m_used=1
+        ;;
+      -t)
+        install_opt+=" -t"
+        ;;
+      -d)
+        install_opt+=" -d"
+        ;;
+      -r)
+        # '-r' 옵션은 이미 기본값으로 설정되어 있으므로 무시
+        ;;
+      --*)
+        # 긴 옵션 형태는 지원하지 않음 (--help는 위에서 처리됨)
+        echo -e "${ERROR} Invalid option: $arg" 1>&2
+        echo "Try 'ak install --help' for more information."
+        exit 1
+        ;;
+      -*)
+        # 알 수 없는 짧은 옵션
+        echo -e "${ERROR} Invalid option: $arg" 1>&2
+        echo "Try 'ak install --help' for more information."
+        exit 1
+        ;;
+      *)
+        # 옵션이 아닌 인자는 위치 인자로 수집
+        install_positional_args+=("$arg")
+        ;;
     esac
+    ((i++))
   done
-
-  # -p 옵션은 필수 패턴 인자 필요
-  if [ $opt_p_used -eq 1 ]; then
-    filter_pattern="${!OPTIND}"
-    if [ -z "$filter_pattern" ]; then
-      echo -e "${ERROR} Option -p requires a pattern argument."
-      echo
-      echo -e "${BOLD}Usage:${NC} ak install -p <pattern> [directory]"
-      echo -e "${BOLD}Example:${NC}"
-      echo -e "  ak install -p debug"
-      echo -e "  ak install -p \"myapp release\""
-      echo -e "  ak install -p debug /path/to/folder"
-      echo
-      echo "For interactive selection of all APKs, use: ak install"
-      exit 1
-    fi
-    ((OPTIND++))
-  fi
 }
 
 # 옵션 조합 검증
 handle_option_combinations() {
-  # '-l', '-a', '-p' 옵션 사용 여부 확인
-  if [ $opt_l_used -eq 1 ] && [ $opt_a_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
-    echo -e "${ERROR} Options -l, -a, and -p cannot be used together."
+  # '-l', '-a', '-f' 옵션 사용 여부 확인
+  if [ $opt_l_used -eq 1 ] && [ $opt_a_used -eq 1 ] && [ $opt_f_used -eq 1 ]; then
+    echo -e "${ERROR} Options -l, -a, and -f cannot be used together."
     exit 1
   fi
 
@@ -120,13 +158,13 @@ handle_option_combinations() {
     exit 1
   fi
 
-  if [ $opt_l_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
-    echo -e "${ERROR} Options -l and -p cannot be used together."
+  if [ $opt_l_used -eq 1 ] && [ $opt_f_used -eq 1 ]; then
+    echo -e "${ERROR} Options -l and -f cannot be used together."
     exit 1
   fi
 
-  if [ $opt_a_used -eq 1 ] && [ $opt_p_used -eq 1 ]; then
-    echo -e "${ERROR} Options -a and -p cannot be used together."
+  if [ $opt_a_used -eq 1 ] && [ $opt_f_used -eq 1 ]; then
+    echo -e "${ERROR} Options -a and -f cannot be used together."
     exit 1
   fi
 
@@ -144,9 +182,9 @@ validate_install_apk_files() {
         # 확장자가 APK 파일이 아닌 경우
         echo -e "${ERROR} Invalid file detected: '$arg'. Only APK files are allowed."
         exit 1
-      elif [ $opt_l_used -eq 1 ] || [ $opt_a_used -eq 1 ] || [ $opt_p_used -eq 1 ]; then
-        # '-l', '-a', '-p' 옵션 사용 시 APK 파일 인자를 허용하지 않음
-        echo -e "${ERROR} Options -l, -a, or -p cannot be used with APK file arguments: '$arg'."
+      elif [ $opt_l_used -eq 1 ] || [ $opt_a_used -eq 1 ] || [ $opt_f_used -eq 1 ]; then
+        # '-l', '-a', '-f' 옵션 사용 시 APK 파일 인자를 허용하지 않음
+        echo -e "${ERROR} Options -l, -a, or -f cannot be used with APK file arguments: '$arg'."
         exit 1
       fi
     fi
@@ -157,9 +195,9 @@ validate_install_apk_files() {
 select_apk_files() {
   apk_files=()
 
-  # '-p' 옵션 사용 시: 인자가 있으면 `validate_and_collect_apk_files`에서 처리 (디렉토리 지원)
+  # '-f' 옵션 사용 시: 인자가 있으면 `validate_and_collect_apk_files`에서 처리 (디렉토리 지원)
   # 인자가 없으면 select_apk_interactively 호출 (현재 디렉토리)
-  if [ $opt_p_used -eq 1 ]; then
+  if [ $opt_f_used -eq 1 ]; then
     if [ $# -eq 0 ]; then
       select_apk_interactively
       apk_files=("${selected_apks[@]}")
@@ -179,7 +217,7 @@ select_apk_files() {
     apk_files+=("${APK_LIST[@]}")
   fi
 
-  # 옵션 없음 또는 -p 옵션 + 인자 있음 → APK 파일 또는 디렉토리 인자 확인
+  # 옵션 없음 또는 -f 옵션 + 인자 있음 → APK 파일 또는 디렉토리 인자 확인
   if [ ${#apk_files[@]} -eq 0 ]; then
     validate_and_collect_apk_files "$@"
   fi
@@ -235,26 +273,26 @@ validate_and_collect_apk_files() {
     fi
 
     # 여러 APK가 있으면 인터랙티브 선택
-    # 패턴 필터링이 있으면 적용
-    if [ -n "$filter_pattern" ]; then
+    # 필터링이 있으면 적용
+    if [ -n "$filter" ]; then
       filtered_apks=()
       for apk in "${apk_list[@]}"; do
-        all_patterns_match=true
-        IFS=' ' read -ra patterns <<< "$filter_pattern"
-        for pattern in "${patterns[@]}"; do
-          if ! echo "$apk" | grep -i -q "$pattern"; then
-            all_patterns_match=false
+        all_filters_match=true
+        IFS=' ' read -ra filters <<< "$filter"
+        for filter_item in "${filters[@]}"; do
+          if ! echo "$apk" | grep -i -q "$filter_item"; then
+            all_filters_match=false
             break
           fi
         done
-        if [ "$all_patterns_match" = true ]; then
+        if [ "$all_filters_match" = true ]; then
           filtered_apks+=("$apk")
         fi
       done
       apk_list=("${filtered_apks[@]}")
 
       if [ ${#apk_list[@]} -eq 0 ]; then
-        echo -e "${ERROR} No APK files found matching all patterns: ${filter_pattern}"
+        echo -e "${ERROR} No APK files found matching all filters: ${filter}"
         exit 1
       fi
 
@@ -296,27 +334,27 @@ select_apk_interactively() {
     exit 1
   fi
 
-  # 필터 패턴이 있는 경우 필터링
-  if [ -n "$filter_pattern" ]; then
+  # 필터가 있는 경우 필터링
+  if [ -n "$filter" ]; then
     filtered_apks=()
     for apk in "${apk_list[@]}"; do
-      # 패턴을 공백으로 분리하여 각각의 패턴을 검색
-      all_patterns_match=true
-      IFS=' ' read -ra patterns <<< "$filter_pattern"
-      for pattern in "${patterns[@]}"; do
-        if ! echo "$apk" | grep -i -q "$pattern"; then
-          all_patterns_match=false
+      # 필터를 공백으로 분리하여 각각의 필터를 검색
+      all_filters_match=true
+      IFS=' ' read -ra filters <<< "$filter"
+      for filter_item in "${filters[@]}"; do
+        if ! echo "$apk" | grep -i -q "$filter_item"; then
+          all_filters_match=false
           break
         fi
       done
-      if [ "$all_patterns_match" = true ]; then
+      if [ "$all_filters_match" = true ]; then
         filtered_apks+=("$apk")
       fi
     done
     apk_list=("${filtered_apks[@]}")
 
     if [ ${#apk_list[@]} -eq 0 ]; then
-      echo -e "${ERROR} No APK files found matching all patterns: '$filter_pattern'"
+      echo -e "${ERROR} No APK files found matching all filters: '$filter'"
       exit 1
     fi
   fi
@@ -573,30 +611,21 @@ start_adb_install() {
 # ─────────────────────────────────────────────────────
 
 cmd_install() {
-  # --help 옵션 체크 (getopts 전에)
-  for arg in "$@"; do
-    if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
-      show_help_install
-      return 0
-    fi
-  done
-  
   # 변수 초기화
   initialize_install_variables
   
-  # 옵션 파싱
+  # 옵션 파싱 (옵션과 위치 인자를 구조적으로 분리)
   process_install_options "$@"
-  shift $((OPTIND -1))
   
-  # 옵션 조합 검증
-  handle_option_combinations "$@"
+  # 옵션 조합 검증 (위치 인자 배열 사용)
+  handle_option_combinations "${install_positional_args[@]}"
   
-  # APK 파일 선택
-  select_apk_files "$@"
-
+  # APK 파일 선택 (위치 인자 배열 사용)
+  select_apk_files "${install_positional_args[@]}"
+  
   # 설치할 디바이스 선택 (멀티 디바이스 지원)
   find_and_select_devices_multi $opt_m_used
-
+  
   # APK 설치 실행
   execute_installation
 }

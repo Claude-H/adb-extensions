@@ -46,7 +46,10 @@ sudo ./build.sh --install
 ## Quick Start
 
 ```bash
-# Install APK
+# Install APK (interactive selection)
+ak install
+
+# Install specific APK
 ak install app.apk
 
 # Get app information
@@ -67,135 +70,58 @@ ak devices
 ak <command> [options] [arguments...]
 ```
 
+**Note:** Many commands support auto-detection of the foreground app when no package is specified. See [Examples](#examples) for detailed usage scenarios.
+
 ### Available Commands
 
 #### APK Management
 
-**install** - Install APK files
-
-```bash
-ak install [options] [apk_files...]
-
-# Examples
-ak install app.apk              # Install single APK
-ak install -l                   # Install latest APK
-ak install -a                   # Install all APKs
-ak install -p debug             # Filter by pattern
-ak install -m app.apk           # Install to all devices
-```
-
-Options:
-- `-l` - Install latest APK file
-- `-a` - Install all APK files
-- `-p <pattern>` - Filter APKs by pattern
-- `-m` - Install to all connected devices
-- `-r` - Replace existing app (default)
-- `-t` - Allow test APKs
-- `-d` - Allow version downgrade
-
-**pull** - Extract APK from device
-
-```bash
-ak pull [package|filename] [filename|package]
-
-# Examples (order is flexible)
-ak pull                         # Extract foreground app
-ak pull myapp.apk               # Extract foreground app as myapp.apk
-ak pull com.example.app         # Extract specific package
-ak pull com.example.app my.apk  # Specify package and filename
-ak pull my.apk com.example.app  # Same as above (order flexible)
-```
+| Command | Description | Key Options |
+|---------|-------------|-------------|
+| `install [apk_files\|directories...]` | Install APK files with interactive selection | `-l` (latest), `-a` (all), `-f <filter>` (filter), `-m` (all devices), `-r` (replace), `-t` (test APKs), `-d` (downgrade) |
+| `pull [package\|filename] [filename\|package]` | Extract APK from device | Order flexible |
 
 #### App Information
 
-**info** - Display app information
-
-```bash
-ak info [package]
-
-# Shows: version, SDK info, debuggable status, installer
-```
-
-**permissions** - List app permissions
-
-```bash
-ak permissions [package]
-
-# Shows granted permissions
-```
-
-**signature** - Display app signature
-
-```bash
-ak signature [package|apk_file]
-
-# Examples
-ak signature                   # Interactive selection (foreground apps + APK files)
-ak signature com.example.app   # Check installed app
-ak signature app.apk           # Check local APK file
-```
-
-Interactive mode displays:
-- Foreground apps from all connected devices with device info
-- All APK files in current directory
-
-**activities** - Display activity stack
-
-```bash
-ak activities [--all]
-
-# Examples
-ak activities                   # Foreground task activities
-ak activities --all             # All task activities
-```
+| Command | Description | Key Options |
+|---------|-------------|-------------|
+| `info [package]` | Display app information (version, SDK, debuggable status, installer) | Auto-detects foreground app if omitted |
+| `permissions [package]` | List granted app permissions | Auto-detects foreground app if omitted |
+| `signature [package\|apk_file]` | Display app signature (supports interactive selection) | - |
+| `activities [--all]` | Display activity stack | `--all` (all tasks) |
 
 #### App Control
 
-**launch** - Launch app
-
-```bash
-ak launch <package>
-
-# Launches main activity
-```
-
-**kill** - Force stop app
-
-```bash
-ak kill [packages...]
-
-# Examples
-ak kill                         # Kill foreground app
-ak kill com.app1 com.app2      # Kill multiple apps
-```
-
-**clear** - Clear app data
-
-```bash
-ak clear [packages...]
-
-# Examples
-ak clear                        # Clear foreground app data
-ak clear com.app1 com.app2     # Clear multiple apps data
-```
-
-**uninstall** - Uninstall app
-
-```bash
-ak uninstall [package]
-
-# Interactive selection if no package specified
-```
+| Command | Description | Key Options |
+|---------|-------------|-------------|
+| `launch <package>` | Launch app (main activity) | - |
+| `kill [packages...]` | Force stop app(s) | Auto-detects foreground app if omitted |
+| `clear [packages...]` | Clear app data | Auto-detects foreground app if omitted |
+| `uninstall [package]` | Uninstall app | Auto-detects foreground app if omitted |
 
 #### Device Management
 
-**devices** - List connected devices
+| Command | Description | Key Options |
+|---------|-------------|-------------|
+| `devices` | List connected devices (brand, model, ID, Android version, CPU) | - |
 
-```bash
-ak devices
+### Interactive UI Features
 
-# Shows: brand, model, ID, Android version, CPU architecture
-```
+#### APK Selection
+
+- **Arrow keys** (Up/Down) - Navigate through APKs
+- **Space** - Toggle selection
+- **A** - Select/deselect all
+- **Number keys** (1-9) - Quick select (single item, 9 or fewer APKs)
+- **Enter** - Confirm selection
+- **Ctrl+C** - Cancel
+
+#### Device Selection
+
+- **Arrow keys** (Up/Down) - Navigate through devices
+- **Number keys** (1-9) - Quick select (9 or fewer devices)
+- **Enter** - Confirm selection
+- **Ctrl+C** - Cancel
 
 ### Global Options
 
@@ -205,55 +131,146 @@ ak --help, -h                   # Show help message
 ak <command> --help             # Show command-specific help
 ```
 
-## Interactive UI Features
-
-### APK Selection
-
-- **Arrow keys** (Up/Down) - Navigate through APKs
-- **Space** - Toggle selection
-- **A** - Select/deselect all
-- **Number keys** (1-9) - Quick select (single item, 9 or fewer APKs)
-- **Enter** - Confirm selection
-- **Ctrl+C** - Cancel
-
-### Device Selection
-
-- **Arrow keys** (Up/Down) - Navigate through devices
-- **Number keys** (1-9) - Quick select (9 or fewer devices)
-- **Enter** - Confirm selection
-- **Ctrl+C** - Cancel
-
 ## Examples
 
-### Install Latest Debug APK
+### APK Installation
 
+**Interactive selection from current directory:**
 ```bash
-ak install -l -p debug
+ak install
 ```
 
-### Install to All Devices
+**Install specific APK:**
+```bash
+ak install app.apk
+```
 
+**Install latest APK:**
+```bash
+ak install -l
+```
+
+**Install latest debug APK:**
+```bash
+ak install -l -f debug
+```
+
+**Install all APKs:**
+```bash
+ak install -a
+```
+
+**Filter:**
+```bash
+ak install -f debug              # Current directory
+ak install -f debug /path/to/dir # Specific directory
+```
+
+**Install to all connected devices:**
 ```bash
 ak install -m app.apk
 ```
 
-### Extract and Check Signature
+**Interactive selection from directory:**
+```bash
+ak install /path/to/dir
+```
 
+### APK Extraction
+
+**Extract foreground app:**
+```bash
+ak pull
+```
+
+**Extract foreground app with custom filename:**
+```bash
+ak pull myapp.apk
+```
+
+**Extract specific package:**
+```bash
+ak pull com.example.app
+```
+
+**Extract with package and filename (order flexible):**
+```bash
+ak pull com.example.app my.apk
+ak pull my.apk com.example.app  # Same as above
+```
+
+### App Information
+
+**Display app information (auto-detects foreground app):**
+```bash
+ak info
+ak info com.example.app
+```
+
+**List app permissions:**
+```bash
+ak permissions
+ak permissions com.example.app
+```
+
+**Check app signature (interactive selection):**
+```bash
+ak signature                   # Interactive: foreground apps + APK files
+ak signature com.example.app   # Installed app
+ak signature app.apk           # Local APK file
+```
+
+**View activity stack:**
+```bash
+ak activities                   # Foreground task
+ak activities --all             # All tasks
+```
+
+### App Control
+
+**Launch app:**
+```bash
+ak launch com.example.app
+```
+
+**Kill app(s):**
+```bash
+ak kill                         # Foreground app
+ak kill com.app1 com.app2      # Multiple apps
+```
+
+**Clear app data:**
+```bash
+ak clear                        # Foreground app
+ak clear com.app1 com.app2     # Multiple apps
+```
+
+**Uninstall app:**
+```bash
+ak uninstall                    # Foreground app (auto-detected)
+ak uninstall com.example.app
+```
+
+### Device Management
+
+**List connected devices:**
+```bash
+ak devices
+```
+
+### Workflow Examples
+
+**Extract and check signature:**
 ```bash
 ak pull com.example.app
 ak signature com.example.app.apk
 ```
 
-### Kill Multiple Apps
-
+**Install, launch, and view info:**
 ```bash
-ak kill com.app1 com.app2 com.app3
-```
-
-### View Activity Stack
-
-```bash
-ak activities --all
+ak install app.apk
+ak launch com.example.app
+ak info com.example.app
 ```
 
 ## Version History

@@ -18,6 +18,7 @@ export LC_ALL=C.UTF-8
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/bootstrap.sh"
+debug_init
 #@@BUILD_EXCLUDE_END
 
 # ─────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ show_help() {
 # ─────────────────────────────────────────────────────
 
 main() {
+
   # ADB 필수 체크
   if ! check_adb_available; then
     exit 1
