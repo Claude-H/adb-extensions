@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.5] - 2026-01-28
+## [1.1.5] - 2026-02-05
 
 ### Added
 - Location information display in APK selection UI
@@ -11,6 +11,12 @@ All notable changes to this project will be documented in this file.
   - Home directory paths abbreviated with `~` for cleaner display
 
 ### Improved
+- `devices` command output format
+  - Changed to table format with Device ID as the first column
+  - Status displayed as clear strings (Connected/Unauthorized/Offline) instead of symbols
+  - Device ID always visible even when `getprop` fails, preventing confusion
+  - Improved error handling: shows "Unknown" values when device properties cannot be retrieved
+  - Subtle color scheme: dimmed headers, minimal data coloring for better readability
 - `extract_unique_directories` function for bash 3.x compatibility
   - Replaced associative array with array iteration for older macOS systems
   - Improved error handling for relative path conversion failures

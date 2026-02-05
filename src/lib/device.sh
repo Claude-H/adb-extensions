@@ -148,10 +148,13 @@ present_device_selection_multi() {
 # 디바이스 목록 출력 (devices 커맨드용)
 # ─────────────────────────────────────────────────────
 
-# 연결된 디바이스를 모델명, Android 버전, 상태와 함께 출력
+# 연결된 디바이스를 테이블 형식으로 출력
 find_and_list_devices() {
     local line device_id status
+    local -a device_ids device_statuses
+    local -a brands models versions cpus status_strings
     
+    # 디바이스 목록 수집
     local devices_list=()
     while IFS= read -r line; do
         [[ "$line" =~ ^List ]] && continue
@@ -164,45 +167,166 @@ find_and_list_devices() {
         return
     fi
 
-    echo
-    echo -e "${CYAN}${BOLD}Connected Devices:${NC}"
-    echo
+    # 모든 디바이스 정보 수집
+    local max_id_len=15 max_model_len=20 max_android_len=12 max_cpu_len=10 max_status_len=11
     
     for line in "${devices_list[@]}"; do
         device_id=$(echo "$line" | awk '{print $1}')
         status=$(echo "$line" | awk '{print $2}')
         
+        device_ids+=("$device_id")
+        device_statuses+=("$status")
+        
+        # 디바이스 ID 길이 업데이트
+        local id_len=${#device_id}
+        [ $id_len -gt $max_id_len ] && max_id_len=$id_len
+        
         case "$status" in
             device)
-                local props brand model version api cpu
+                local props brand model version api cpu status_str
                 props=$(adb -s "$device_id" shell getprop 2>/dev/null)
                 
-                brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
-                # 변경 후: bash 3.2 호환 (awk 사용)
-                brand=$(echo "$brand" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
-                model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
-                cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
-                version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
-                api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
+                # getprop 실패 시 기본값 설정
+                if [ -z "$props" ]; then
+                    brand="Unknown"
+                    model="Device"
+                    version="Unknown"
+                    api="Unknown"
+                    cpu="Unknown"
+                else
+                    brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
+                    brand=$(echo "$brand" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
+                    model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
+                    cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
+                    version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
+                    api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
+                    
+                    # 빈 값 처리
+                    [ -z "$brand" ] && brand="Unknown"
+                    [ -z "$model" ] && model="Device"
+                    [ -z "$version" ] && version="Unknown"
+                    [ -z "$api" ] && api="Unknown"
+                    [ -z "$cpu" ] && cpu="Unknown"
+                fi
                 
-                echo -e "  ${GREEN}${brand} ${model}${NC}"
-                echo -e "     ID: ${BOLD}${device_id}${NC}  │  Android: ${BOLD}${version} (API ${api})${NC}  │  CPU: ${BOLD}${cpu}${NC}"
+                brands+=("$brand")
+                models+=("$brand $model")
+                versions+=("$version (API $api)")
+                cpus+=("$cpu")
+                status_strings+=("Connected")
+                
+                # 길이 업데이트 (배열의 마지막 요소 접근)
+                local model_len=${#models[${#models[@]}-1]}
+                [ $model_len -gt $max_model_len ] && max_model_len=$model_len
+                local android_len=${#versions[${#versions[@]}-1]}
+                [ $android_len -gt $max_android_len ] && max_android_len=$android_len
+                local cpu_len=${#cpus[${#cpus[@]}-1]}
+                [ $cpu_len -gt $max_cpu_len ] && max_cpu_len=$cpu_len
                 ;;
             unauthorized)
-                echo -e "  ${RED}UNAUTHORIZED DEVICE${NC} (USB debugging not authorized)"
-                echo -e "     ID: ${BOLD}${device_id}${NC}"
+                brands+=("")
+                models+=("-")
+                versions+=("-")
+                cpus+=("-")
+                status_strings+=("Unauthorized")
                 ;;
             offline)
-                echo -e "  ${PURPLE}OFFLINE DEVICE${NC} (Device disconnected)"
-                echo -e "     ID: ${BOLD}${device_id}${NC}"
+                brands+=("")
+                models+=("-")
+                versions+=("-")
+                cpus+=("-")
+                status_strings+=("Offline")
                 ;;
             *)
-                echo -e "  ${YELLOW}UNKNOWN STATUS${NC} (${status})"
-                echo -e "     ID: ${BOLD}${device_id}${NC}"
+                brands+=("")
+                models+=("-")
+                versions+=("-")
+                cpus+=("-")
+                status_strings+=("Unknown")
                 ;;
         esac
-        echo
     done
+
+    echo
+    echo -e "${CYAN}${BOLD}Connected Devices:${NC}"
+    echo
+    
+    # 테이블 헤더 (차분한 색상)
+    local header_id_pad=$((max_id_len - 9))  # "Device ID" 길이 = 9
+    local header_model_pad=$((max_model_len - 5))  # "Model" 길이 = 5
+    local header_android_pad=$((max_android_len - 7))  # "Android" 길이 = 7
+    local header_cpu_pad=$((max_cpu_len - 3))  # "CPU" 길이 = 3
+    local header_status_pad=$((max_status_len - 6))  # "Status" 길이 = 6
+    
+    echo -ne "${DIM}${BOLD}Device ID${NC}"
+    printf "%${header_id_pad}s  " ""
+    echo -ne "${DIM}${BOLD}Model${NC}"
+    printf "%${header_model_pad}s  " ""
+    echo -ne "${DIM}${BOLD}Android${NC}"
+    printf "%${header_android_pad}s  " ""
+    echo -ne "${DIM}${BOLD}CPU${NC}"
+    printf "%${header_cpu_pad}s  " ""
+    echo -e "${DIM}${BOLD}Status${NC}"
+    
+    # 구분선
+    separator=""
+    total_width=$((max_id_len + max_model_len + max_android_len + max_cpu_len + max_status_len + 8))
+    i=0
+    while [ $i -lt $total_width ]; do
+        separator="${separator}─"
+        i=$((i + 1))
+    done
+    echo -e "${DIM}${separator}${NC}"
+    
+    # 테이블 데이터
+    i=0
+    while [ $i -lt ${#device_ids[@]} ]; do
+        device_id="${device_ids[$i]}"
+        model="${models[$i]}"
+        version="${versions[$i]}"
+        cpu="${cpus[$i]}"
+        status_str="${status_strings[$i]}"
+        
+        # 색상 적용 (차분하게)
+        colored_id="${BOLD}${device_id}${NC}"
+        colored_model="${model}"
+        colored_version="${version}"
+        colored_cpu="${cpu}"
+        
+        case "$status_str" in
+            Connected)
+                colored_status="${status_str}"
+                ;;
+            Unauthorized)
+                colored_status="${RED}${status_str}${NC}"
+                ;;
+            Offline)
+                colored_status="${DIM}${status_str}${NC}"
+                ;;
+            *)
+                colored_status="${DIM}${status_str}${NC}"
+                ;;
+        esac
+        
+        # printf로 정렬 (색상 코드 길이 보정)
+        id_padding=$((max_id_len - ${#device_id}))
+        model_padding=$((max_model_len - ${#model}))
+        version_padding=$((max_android_len - ${#version}))
+        cpu_padding=$((max_cpu_len - ${#cpu}))
+        status_padding=$((max_status_len - ${#status_str}))
+        
+        local formatted_line
+        formatted_line=$(printf "%s%${id_padding}s  %s%${model_padding}s  %s%${version_padding}s  %s%${cpu_padding}s  %s%${status_padding}s" \
+            "$colored_id" "" \
+            "$colored_model" "" \
+            "$colored_version" "" \
+            "$colored_cpu" "" \
+            "$colored_status")
+        echo -e "$formatted_line"
+        
+        i=$((i + 1))
+    done
+    echo
 }
 
 # 선택된 디바이스들을 출력하는 함수 (install 커맨드용)
