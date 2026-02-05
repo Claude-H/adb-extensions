@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
   - Device ID always visible even when `getprop` fails, preventing confusion
   - Improved error handling: shows "Unknown" values when device properties cannot be retrieved
   - Subtle color scheme: dimmed headers, minimal data coloring for better readability
+- Device selection UI error handling: shows "Unknown Device (device_id): device not responding" when `getprop` fails
 - `extract_unique_directories` function for bash 3.x compatibility
   - Replaced associative array with array iteration for older macOS systems
   - Improved error handling for relative path conversion failures

@@ -7,12 +7,12 @@
 #@@BUILD_EXCLUDE_END
 
 # 디바이스 정보 출력 함수
-# 표시 레벨: minimal(브랜드 모델명) | short(+ID) | normal(+Android/API) | full(+CPU)
+# 표시 레벨: minimal(브랜드 모델명) | short(+ID) | normal(+Android/API)
 pretty_device() {
     local device_id="$1"
     local level="${2:-normal}"  # 기본값 normal
-    local props brand model version api cpu
-    local device_status
+    local props brand model version api
+    local device_status error_reason
 
     # 디바이스 상태 확인
     device_status=$(adb devices | grep "$device_id" | awk '{print $2}')
@@ -21,7 +21,20 @@ pretty_device() {
         return
     fi
 
-    props=$(adb -s "$device_id" shell getprop)
+    # getprop 명령 실행
+    props=$(adb -s "$device_id" shell getprop 2>/dev/null)
+    
+    # getprop 실패 시 에러 처리
+    if [ -z "$props" ]; then
+        error_reason="device not responding"
+        # minimal 레벨이 아닌 경우에만 디바이스 ID와 에러 이유 표시
+        if [[ "$level" == "minimal" ]]; then
+            echo "Unknown Device"
+        else
+            echo "Unknown Device ($device_id): $error_reason"
+        fi
+        return
+    fi
 
     brand=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.brand" {print $4}' | tr -d '\r\n')
     # 변경 후: bash 3.2 호환 (awk 사용)
@@ -29,6 +42,12 @@ pretty_device() {
     model=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.model" {print $4}' | tr -d '\r\n')
     version=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.release" {print $4}' | tr -d '\r\n')
     api=$(echo "$props" | awk -F'[][]' '$2 == "ro.build.version.sdk" {print $4}' | tr -d '\r\n')
+    
+    # 빈 값 처리
+    [ -z "$brand" ] && brand="Unknown"
+    [ -z "$model" ] && model="Device"
+    [ -z "$version" ] && version="Unknown"
+    [ -z "$api" ] && api="Unknown"
 
     case "$level" in
         minimal)
@@ -36,10 +55,6 @@ pretty_device() {
             ;;
         short)
             echo "$brand $model ($device_id)"
-            ;;
-        full)
-            cpu=$(echo "$props" | awk -F'[][]' '$2 == "ro.product.cpu.abi" {print $4}' | tr -d '\r\n')
-            echo "$brand $model ($device_id) Android $version, API $api, CPU $cpu"
             ;;
         *)  # normal (default)
             echo "$brand $model ($device_id) Android $version, API $api"
